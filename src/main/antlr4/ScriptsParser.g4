@@ -1,3 +1,19 @@
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 parser grammar ScriptsParser;
 
 @header {
@@ -109,11 +125,11 @@ expression_between_dots
     | INTEGER                        # exprInteger
     | (TRUE | FALSE)                   # exprBoolean
     | NONE                               # exprNone
-    | TEXT subscription*                   # exprText
-    | formatted_text subscription*           # exprFText
-	| list subscription*                       # exprList
-	| dictionary subscription*                   # exprDictionary
-	| OPEN_PAR expression CLOSE_PAR subscription*  # exprParExpr
+    | TEXT get_from_list*                   # exprText
+    | formatted_text get_from_list*           # exprFText
+	| list get_from_list*                       # exprList
+	| dictionary get_from_list*                   # exprDictionary
+	| OPEN_PAR expression CLOSE_PAR get_from_list*  # exprParExpr
 	;
 
 thread_expression
@@ -131,11 +147,14 @@ throw_
     ;
 
 function
-	: VARIABLE arguments? subscription*
+	: VARIABLE arguments? get_from_list*
 	;
 
 arguments
-	: OPEN_PAR ((expression (COMMA expression)* (COMMA splatList)* )? | (splatList (COMMA splatList*))) CLOSE_PAR
+	: OPEN_PAR ( (expression | simpleAssignment | splatList | splatDict)
+	             (COMMA (expression | simpleAssignment | splatList | splatDict))*
+	           )?
+	  CLOSE_PAR
 	;
 
 list
@@ -156,9 +175,13 @@ splatList
     : TIMES expression_part
     ;
 
-//splatDict
-//    : TIMES TIMES expression_part #splatDict // not supported yet. Not sure if this is going to be supported.
-//    ;
+splatDict
+    : TIMES TIMES expression_part
+    ;
+
+simpleAssignment
+    : VARIABLE ASSIGNMENT expression
+    ;
 
 assignment
 	: GLOBAL? VARIABLE
@@ -170,13 +193,9 @@ deletion
 	: DEL VARIABLE
 	;
 
-subscription
-	: OPEN_BRACKET (sub1=expression? COLON sub2=expression? | subSingle=expression) CLOSE_BRACKET
+get_from_list
+	: OPEN_BRACKET (nb1=expression? COLON nb2=expression? | nbSingle=expression) CLOSE_BRACKET
 	;
-
-single_subscription
-    : OPEN_BRACKET expression CLOSE_BRACKET
-    ;
 
 comparison
 	: comp_molecule ( operator += (AND | OR) comp_molecule )*

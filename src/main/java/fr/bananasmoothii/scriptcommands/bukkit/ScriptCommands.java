@@ -1,41 +1,49 @@
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package fr.bananasmoothii.scriptcommands.bukkit;
 
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
 import fr.bananasmoothii.scriptcommands.core.antlr4parsing.ScriptsParser;
-import fr.bananasmoothii.scriptcommands.core.configs_storage.Config;
-import fr.bananasmoothii.scriptcommands.core.configs_storage.ContainingScripts;
-import fr.bananasmoothii.scriptcommands.core.configs_storage.Storage;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.*;
 import fr.bananasmoothii.scriptcommands.core.execution.Context;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptsExecutor;
+import org.bukkit.Server;
 import org.bukkit.plugin.java.JavaPlugin;
-
-import java.util.HashMap;
 
 public final class ScriptCommands extends JavaPlugin {
 
-    public static CustomLogger logger;
-
     @Override
     public void onEnable() {
-        logger = new CustomLogger(this.getLogger());
-        Config.load(this);
+        CustomLogger.setLogger(getLogger());
+        Config.load(this::saveDefaultConfig);
 
-        String command = "commandsThatMakeSense";
-        logger.info("Doing command " + command);
-        //TODO: make the default commands (reload...)
+        StringScriptValueMap<Object> baseVars = new StringScriptValueMap<>();
+        baseVars.put("server", new ScriptValue<>(this.getServer().getName() + getServer().toString()));
 
-        ScriptsParser.StartContext context = Config.firstInstance.getCorrespondingContainingScripts(ContainingScripts.Type.COMMAND, command).parseTree;
-        HashMap<String, ScriptValue<?>> baseVars = new HashMap<>();
-        baseVars.put("player", new ScriptValue<>("Bananasmoothii"));
-        baseVars.put("command", new ScriptValue<>(command));
-        ScriptsExecutor visitor = new ScriptsExecutor(new Context(new String[] {"arg1", "argu2eul", "argggg3!"}, baseVars));
-        visitor.visit(context);
+        Context.threadTrigger(ContainingScripts.Type.EVENT, "server_start", baseVars);
 
     }
 
     @Override
     public void onDisable() {
-        Storage.firstInstance.saveAndClose();
+        Storage.saveAndClose();
     }
 }
+
+//TODO: make the default commands (reload...)
+//TODO: onServerStart and onServerStop events

@@ -1,40 +1,73 @@
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package fr.bananasmoothii.scriptcommands.core;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+@SuppressWarnings("UseOfSystemOutOrSystemErr")
 public class CustomLogger {
-    private final Logger logger;
-    private boolean logThroughInfo;
+    public static CustomLogger mainLogger;
 
-    public CustomLogger(Logger logger) {
-        this(logger, false);
-    }
+    private static @Nullable Logger logger = null;
+    private static boolean logThroughInfo = false;
+    private static @NotNull Level level = Level.INFO;
 
-    public CustomLogger(Logger logger, boolean logThroughInfo) {
-        this.logger = logger;
-        this.logThroughInfo = logThroughInfo;
-        if (logger.getLevel() == null)
-            logger.setLevel(Level.INFO);
-    }
+    private CustomLogger() { }
 
-    public void log(@NotNull Level level, String msg) {
-        //System.out.println("                                                             logging at " + level + " (getLevel = " + logger.getLevel() + "): " + msg);
-        if (!logThroughInfo || level.intValue() >= 800)
-            logger.log(level, msg);
+    public static void log(@NotNull Level logLevel, Object msg) {
+        if (logger != null && (!logThroughInfo || logLevel.intValue() >= 800))
+            logger.log(logLevel, msg.toString());
         else {
-            if (level.intValue() == 700 && logger.getLevel().intValue() <= 700)
-                logger.info("[CONFIG] "+msg);
-            else if (level.intValue() == 500 && logger.getLevel().intValue() <= 500)
-                logger.info("[FINE] "+msg);
-            else if (level.intValue() == 400 && logger.getLevel().intValue() <= 400)
-                logger.info("[FINER] "+msg);
-            else if (level.intValue() == 300 && logger.getLevel().intValue() <= 300)
-                logger.info("[FINEST] "+msg);
-            else
-                logger.info("[UNKNOWN IMPORTANCE] "+msg);
+            switch (logLevel.intValue()) {
+                case 1000:
+                    if (level.intValue() > 1000) break;
+                    System.err.println("[ERROR] " + msg);
+                    break;
+                case 900:
+                    if (level.intValue() > 900) break;
+                    System.err.println(msg);
+                    break;
+                case 800:
+                    if (level.intValue() > 800) break;
+                    System.out.println(msg); // no need for "[INFO]" as it is already there in a minecraft server's logs
+                    break;
+                case 700:
+                    if (level.intValue() > 700) break;
+                    System.out.println("[CONFIG] " + msg);
+                    break;
+                case 500:
+                    if (level.intValue() > 500) break;
+                    System.out.println("[FINE] " + msg);
+                    break;
+                case 400:
+                    if (level.intValue() > 400) break;
+                    System.out.println("[FINER] " + msg);
+                    break;
+                case 300:
+                    if (level.intValue() > 300) break;
+                    System.out.println("[FINEST] " + msg);
+                    break;
+                default:
+                    System.out.println("[UNKNOWN IMPORTANCE] " + msg);
+            }
         }
     }
 
@@ -49,9 +82,9 @@ public class CustomLogger {
      * level then the given message is forwarded to all the
      * registered output Handler objects.
      * <p>
-     * @param   msg     The string message (or a key in the message catalog)
+     * @param   msg     The Object message (or a key in the message catalog)
      */
-    public void severe(String msg) {
+    public static void severe(Object msg) {
         log(Level.SEVERE, msg);
     }
 
@@ -62,9 +95,9 @@ public class CustomLogger {
      * level then the given message is forwarded to all the
      * registered output Handler objects.
      * <p>
-     * @param   msg     The string message (or a key in the message catalog)
+     * @param   msg     The Object message (or a key in the message catalog)
      */
-    public void warning(String msg) {
+    public static void warning(Object msg) {
         log(Level.WARNING, msg);
     }
 
@@ -75,9 +108,9 @@ public class CustomLogger {
      * level then the given message is forwarded to all the
      * registered output Handler objects.
      * <p>
-     * @param   msg     The string message (or a key in the message catalog)
+     * @param   msg     The Object message (or a key in the message catalog)
      */
-    public void info(String msg) {
+    public static void info(Object msg) {
         log(Level.INFO, msg);
     }
 
@@ -88,9 +121,9 @@ public class CustomLogger {
      * level then the given message is forwarded to all the
      * registered output Handler objects.
      * <p>
-     * @param   msg     The string message (or a key in the message catalog)
+     * @param   msg     The Object message (or a key in the message catalog)
      */
-    public void config(String msg) {
+    public static void config(Object msg) {
         log(Level.CONFIG, msg);
     }
 
@@ -101,9 +134,9 @@ public class CustomLogger {
      * level then the given message is forwarded to all the
      * registered output Handler objects.
      * <p>
-     * @param   msg     The string message (or a key in the message catalog)
+     * @param   msg     The Object message (or a key in the message catalog)
      */
-    public void fine(String msg) {
+    public static void fine(Object msg) {
         log(Level.FINE, msg);
     }
 
@@ -114,9 +147,9 @@ public class CustomLogger {
      * level then the given message is forwarded to all the
      * registered output Handler objects.
      * <p>
-     * @param   msg     The string message (or a key in the message catalog)
+     * @param   msg     The Object message (or a key in the message catalog)
      */
-    public void finer(String msg) {
+    public static void finer(Object msg) {
         log(Level.FINER, msg);
     }
 
@@ -127,26 +160,36 @@ public class CustomLogger {
      * level then the given message is forwarded to all the
      * registered output Handler objects.
      * <p>
-     * @param   msg     The string message (or a key in the message catalog)
+     * @param   msg     The Object message (or a key in the message catalog)
      */
-    public void finest(String msg) {
+    public static void finest(Object msg) {
         log(Level.FINEST, msg);
     }
 
-    public Level getLevel() {
-        return logger.getLevel();
+
+    public static @NotNull Level getLevel() {
+        return level;
     }
 
-    public void setLevel(@NotNull Level level) {
-        System.out.println("level set: " + level);
-        logger.setLevel(level);
+    public static void setLevel(@NotNull Level level) {
+        if (logger != null) logger.setLevel(level);
+        CustomLogger.level = level;
     }
 
-    public boolean isLogThroughInfo() {
+    public static boolean isLogThroughInfo() {
         return logThroughInfo;
     }
 
-    public void setLogThroughInfo(boolean logThroughInfo) {
-        this.logThroughInfo = logThroughInfo;
+    public static void setLogThroughInfo(boolean logThroughInfo) {
+        CustomLogger.logThroughInfo = logThroughInfo;
+    }
+
+    public static @Nullable Logger getLogger() {
+        return logger;
+    }
+
+    public static void setLogger(@Nullable Logger logger) {
+        CustomLogger.logger = logger;
+        if (logger != null) level = logger.getLevel();
     }
 }

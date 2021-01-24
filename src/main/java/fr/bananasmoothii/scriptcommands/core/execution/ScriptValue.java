@@ -1,22 +1,42 @@
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package fr.bananasmoothii.scriptcommands.core.execution;
 
-import fr.bananasmoothii.scriptcommands.core.configs_storage.ScriptValueList;
-import fr.bananasmoothii.scriptcommands.core.configs_storage.ScriptValueMap;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueCollection;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueMap;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 /**
  * Value for the Scripts. Each variable in the Scripts are in fact a ScriptValue.
  * @see ScriptValue#ScriptValue(Object) the constructor
  */
-public class ScriptValue<T> implements Cloneable {
+@SuppressWarnings("unchecked")
+public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 	
 	/**
 	* The value this class is made for
 	*/
+	@NotNull
 	public final T v;
 
 	/**
@@ -39,10 +59,10 @@ public class ScriptValue<T> implements Cloneable {
 	 *     <li>0 for None</li>
 	 *     <li>1 for Integer</li>
 	 *     <li>2 for Decimal</li>
-	 *     <li>3 for Boolean</li>
-	 *     <li>4 for Text</li>
+	 *     <li>3 for Text</li>
+	 *     <li>4 for Boolean</li>
 	 *     <li>5 for List</li>
-	 *     <li>6 forDictionary</li>
+	 *     <li>6 for Dictionary</li>
 	 * </ul>
 	 */
 	public final byte typeByte;
@@ -59,11 +79,12 @@ public class ScriptValue<T> implements Cloneable {
 	 *         <li>{@link Double}</li>
 	 *         <li>{@link String}</li>
 	 *         <li>{@link Boolean}</li>
-	 *         <li>{@link ArrayList}{@literal <ScriptValue>}</li>
-	 *         <li>{@link HashMap}{@literal <ScriptValue, ScriptValue>}</li>
+	 *         <li>{@link ScriptValueList}{@literal <ScriptValue>}</li>
+	 *         <li>{@link ScriptValueMap}{@literal <ScriptValue, ScriptValue>}</li>
+	 *         <li>{@link List}{@literal <Object>}</li> will be automatically converted to a {@link ScriptValueList}
+	 *         <li>{@link Map}{@literal <Object, Object>}</li> will be automatically converted to a {@link ScriptValueMap}
 	 *     </ul>
 	 */
-
 	public ScriptValue(@Nullable T obj) {
 		
 		if (obj == null || obj instanceof NoneType) {
@@ -96,14 +117,62 @@ public class ScriptValue<T> implements Cloneable {
 						"Boolean, ScriptValueList or ScriptValueMap .");
 		}
 	}
+
+	/**
+	 * Contrary of {@link #toNormalClass(boolean)}</br>
+	 * Basically the same as {@link #ScriptValue(Object)} but has an extra check for {@link Map}s and {@link List}s,
+	 * and recursively converts inside them to ScriptValues.
+	 * @param keysAreJson whether the keys of hashMaps should be a json of the real key, because in json, every key is a string.
+	 * @return a new {@link ScriptValue}
+	 */
+	@SuppressWarnings("rawtypes")
+	public static <T> ScriptValue<? extends T> toScriptValue(@Nullable T obj, boolean keysAreJson) {
+		if (obj instanceof List) return new ScriptValue(ScriptValueList.toScriptValues((List<Object>) obj, keysAreJson));
+		if (obj instanceof Map) return new ScriptValue(ScriptValueMap.toScriptValues((Map<Object, Object>) obj, keysAreJson));
+		else return new ScriptValue<>(obj);
+	}
+
+	/**
+	 * Contrary of {@link #toScriptValue(Object, boolean)}
+	 * @return {@link Object} because for example, the normal class of
+	 * {@link ScriptValueMap} is {@link HashMap}
+	 */
+	public @Nullable Object toNormalClass(boolean forJson) {
+		if (v instanceof ScriptValueCollection) return ((ScriptValueCollection) v).toNormalClasses(forJson);
+		else if (is("None")) return null;
+		else return v;
+	}
+
+	private static Pattern integerPattern = Pattern.compile("\\d+");
+	private static Pattern decimalPattern = Pattern.compile("\\d+\\.\\d+");
+
+	/**
+	 * This method is used for converting simple {@link ScriptValue}s that you got as {@link String} to a real ScriptValue,
+	 * for example with "123.4" you will get a new ScriptValue as if you did {@code new ScriptValue(123.4)}.
+	 * @throws IllegalArgumentException if the passed String cannot be converted to {@code Integer}, {@code Decimal} or
+	 * {@code Boolean}.
+	 */
+	public static ScriptValue<?> notCollectionToScriptValue(String s) {
+		if (s.equals("true")) return new ScriptValue<>(true);
+		if (s.equals("false")) return new ScriptValue<>(false);
+		// using regexes here because I don't want that to work if there are spaces or strange values
+		if (integerPattern.matcher(s).matches()) return new ScriptValue<>(Integer.valueOf(s));
+		if (decimalPattern.matcher(s).matches()) return new ScriptValue<>(Double.valueOf(s));
+		throw new IllegalArgumentException("the passed String (\"" + s + "\") cannot be converted to Integer, Decimal or Boolean.");
+	}
 	
 	@Override
 	public boolean equals(Object o) {
 		if (! (o instanceof ScriptValue))
 			return false;
-		return this.v.equals(((ScriptValue<?>)o).v);
+		return v.equals(((ScriptValue<?>)o).v);
 	}
-	
+
+	@Override
+	public int hashCode() {
+		return v.hashCode();
+	}
+
 	public boolean is(String type) {
 		return this.type.equals(type);
 	}
@@ -111,40 +180,72 @@ public class ScriptValue<T> implements Cloneable {
 	public boolean isNumber() {
 		return is("Integer") || is("Decimal");
 	}
+
+	@NotNull
+	@Override
+	public Iterator<ScriptValue<?>> iterator() {
+		return iterator("<unknown location>");
+	}
 	
-	public ArrayList<ScriptValue<Object>> iterableList(String where) {
+	public Iterator<ScriptValue<?>> iterator(String where) {
 		if (is("List")) {
-			return ((ScriptValueList<Object>) v).toNormalClasses();
+			return ((ScriptValueList) v).iterator(); // idk what to do about this raw type
 		}
 		if (is("Text")) {
-			String s = (String) v;
-			ArrayList<ScriptValue<Object>> list = new ArrayList<>();
-			for (int i = 0; i < s.length(); i++) {
-				list.add(new ScriptValue<>(String.valueOf(s.charAt(i))));
-			}
-			return list;
+			return new Iterator<ScriptValue<?>>() {
+				private int currentIndex = 0;
+				private final String string = (String) v;
+				private final int size = string.length();
+
+				@Override
+				public boolean hasNext() {
+					return currentIndex < size;
+				}
+
+				@Override
+				public ScriptValue<?> next() {
+					return new ScriptValue<>(String.valueOf(string.charAt(currentIndex++)));
+				}
+			};
 		}
 		if (is("Dictionary")) {
-			ArrayList<ScriptValue<Object>> list = new ArrayList<>();
-			for (Entry<ScriptValue<Object>, ScriptValue<Object>> entry: ((ScriptValueMap<Object, Object>) v).entrySet()) {
-				ArrayList<ScriptValue<?>> pair = new ArrayList<>();
-				pair.add(entry.getKey());
-				pair.add(entry.getValue());
-				list.add(new ScriptValue<>(pair));
-			}
-			return list;
+			return new Iterator<ScriptValue<?>>() {
+				private final Iterator<Entry<ScriptValue<Object>, ScriptValue<Object>>> iterator = ((ScriptValueMap<Object, Object>) v).entrySet().iterator();
+
+				@Override
+				public boolean hasNext() {
+					return iterator.hasNext();
+				}
+
+				@Override
+				public ScriptValue<?> next() {
+					ScriptValueList<Object> pair = new ScriptValueList<>();
+					Entry<ScriptValue<Object>, ScriptValue<Object>> next = iterator.next();
+					pair.add(next.getKey());
+					pair.add(next.getValue());
+					return new ScriptValue<>(pair);
+				}
+			};
 		}
 		throw ScriptException.invalidType("[iteration] " + where, "List, Text or Dictionary", where.replaceAll("^.*?\\s(\\S+)$", "\\1"), type);
-		
 	}
 
+	public ScriptValueList<Object> iterableList(String where) {
+		Iterator<ScriptValue<?>> iterator = iterator(where);
+		ScriptValueList<Object> list = new ScriptValueList<>();
+		while (iterator.hasNext()) {
+			list.add((ScriptValue<Object>) iterator.next());
+		}
+		return list;
+	}
+
+	@SuppressWarnings("MethodDoesntCallSuperMethod")
 	@Override
 	public ScriptValue<T> clone() {
 		switch (type) {
 			case "List":
-				return new ScriptValue<>((T) ((ScriptValueList<?>) v).clone());
 			case "Dictionary":
-				return new ScriptValue<>((T)((ScriptValueMap<?, ?>) v).clone());
+				return new ScriptValue<>((T) ((ScriptValueCollection) v).clone());
 			default:
 				return this;
 		}
@@ -171,7 +272,7 @@ public class ScriptValue<T> implements Cloneable {
 			return (String) v;
 		}
 		catch (ClassCastException e) {
-			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth), "Text", v.toString(), type);
+			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth + 1), "Text", v.toString(), type);
 		}
 	}
 	
@@ -185,7 +286,7 @@ public class ScriptValue<T> implements Cloneable {
 				return ((Integer) v).doubleValue();
 			}
 			catch (ClassCastException ignored) { }
-			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth), "Decimal or Integer", v.toString(), type);
+			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth + 1), "Decimal or Integer", v.toString(), type);
 		}
 	}
 	
@@ -199,7 +300,7 @@ public class ScriptValue<T> implements Cloneable {
 				return ((Double) v).intValue();
 			}
 			catch (ClassCastException ignored) { }
-			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth), "Integer", v.toString(), type);
+			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth + 1), "Integer", v.toString(), type);
 		}
 	}
 	
@@ -209,7 +310,7 @@ public class ScriptValue<T> implements Cloneable {
 			return (Boolean) v;
 		}
 		catch (ClassCastException e) {
-			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth), "Boolean", v.toString(), type);
+			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth + 1), "Boolean", v.toString(), type);
 		}
 	}
 
@@ -219,7 +320,7 @@ public class ScriptValue<T> implements Cloneable {
 			return (ScriptValueList<Object>) v;
 		}
 		catch (ClassCastException e) {
-			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth), "List", v.toString(), type);
+			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth + 1), "List", v.toString(), type);
 		}
 	}
 
@@ -229,7 +330,7 @@ public class ScriptValue<T> implements Cloneable {
 			return (ScriptValueMap<Object, Object>) v;
 		}
 		catch (ClassCastException e) {
-			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth), "Dictionary", v.toString(), type);
+			throw ScriptException.invalidType(StackTraceUtils.getFromStackTrace(callingFuncDepth + 1), "Dictionary", v.toString(), type);
 		}
 	}
 }

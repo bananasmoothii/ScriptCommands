@@ -1,6 +1,22 @@
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package fr.bananasmoothii.scriptcommands.core.execution;
 
-import fr.bananasmoothii.scriptcommands.core.configs_storage.ScriptValueList;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
 
 import java.util.ArrayList;
 import java.util.Map.Entry;
@@ -9,6 +25,7 @@ import java.util.Map.Entry;
  * This class contains only static methods used to switch easier between
  * ArrayLists of {@link ScriptValue} and Strings
  */
+@SuppressWarnings("unchecked")
 public class Types {
 	
 	//protected static Pattern patternType = Pattern.compile("^(\\[*)[^\\(]+\\.([^\\.\\(]+)(?:\\(.*\\))?$");
@@ -29,6 +46,8 @@ public class Types {
 	}
 
 	/**
+	 * This doesn't used default toString() methods, because for example, a list of
+	 * strings will result in {@code [a, b, c]} and not in {@code ["a", "b", "c"]} as excepted.
 	 * @see Types#getPrettyArgs(ScriptValueList)
 	 */
 	public static String getPrettyArg(ScriptValue<?> arg) {
@@ -38,11 +57,11 @@ public class Types {
 			case "List":
 				return "[" + getPrettyArgs(arg.asList()) + "]";
 			case "Dictionary":
-				if (arg.asMap().size() == 0) {
+				if (arg.asMap().size() != 0) {
 					ArrayList<String> keyValues = new ArrayList<>();
 					for (Object entryObj : arg.asMap().entrySet()) {
 						Entry<ScriptValue<?>, ScriptValue<?>> entry = (Entry<ScriptValue<?>, ScriptValue<?>>) entryObj;
-						keyValues.add(getPrettyArg(new ScriptValue<>(entry.getKey())) + "=" + getPrettyArg(new ScriptValue<>(entry.getValue())));
+						keyValues.add(getPrettyArg(entry.getKey()) + "=" + getPrettyArg(entry.getValue()));
 					}
 					return "[" + String.join(", ", keyValues) + "]";
 				}

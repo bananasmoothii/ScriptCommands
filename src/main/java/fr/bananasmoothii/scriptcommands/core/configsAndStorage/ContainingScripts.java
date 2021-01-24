@@ -1,4 +1,20 @@
-package fr.bananasmoothii.scriptcommands.core.configs_storage;
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+package fr.bananasmoothii.scriptcommands.core.configsAndStorage;
 
 import fr.bananasmoothii.scriptcommands.core.antlr4parsing.Parsing;
 import fr.bananasmoothii.scriptcommands.core.antlr4parsing.ScriptsParser;
@@ -21,9 +37,10 @@ import java.util.HashMap;
  * and everything is public.<br/>
  * There is one constructor, used to initialize the default fields and have no repeated code
  */
+@SuppressWarnings("unchecked")
 public abstract class ContainingScripts {
-    public String name;
-    public HashMap<String, Object> hashMap;
+    public final String name;
+    public final HashMap<String, Object> hashMap;
     public ArrayList<String> rawScriptLines;
     public ScriptsParser.StartContext parseTree;
     public boolean directScripts;
@@ -37,7 +54,7 @@ public abstract class ContainingScripts {
         assert hashMap.get("script") instanceof ArrayList;
         rawScriptLines = (ArrayList<String>) hashMap.get("script");
         if (hashMap.containsKey("direct-scripts")) directScripts = (boolean) hashMap.get("direct-scripts");
-        else directScripts = Config.firstInstance.directScripts;
+        else directScripts = Config.directScripts;
         parseTree = Parsing.reformatAndParse(name, rawScriptLines, directScripts);
         errorsOnLastParsing = parseTree.exception != null;
     }

@@ -1,6 +1,22 @@
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package fr.bananasmoothii.scriptcommands.core;
 
-import fr.bananasmoothii.scriptcommands.bukkit.ScriptCommands;
+import static fr.bananasmoothii.scriptcommands.core.CustomLogger.mainLogger;
 
 /**
  * For making a parallel thread showing process of something like <br/>
@@ -17,7 +33,7 @@ public class ProgressPrinter extends Thread {
     private int digitsShown;
     private double progressPercent = 0.0;
     private boolean cancelled = false;
-    private boolean autoMultiply = true;
+    private final boolean autoMultiply;
 
     /**
      * Same as {@link ProgressPrinter#ProgressPrinter(String, double, int, boolean)} but with 0 for <i>digitsShown</i>,
@@ -57,7 +73,7 @@ public class ProgressPrinter extends Thread {
         this.prefix = prefix;
         this.delay = delay;
         this.digitsShown = digitsShown;
-        this.setName("Progress Printer");
+        this.setName("Progress");
         this.start();
         this.autoMultiply = autoMultiply;
     }
@@ -67,6 +83,7 @@ public class ProgressPrinter extends Thread {
         while (progressPercent < 100.0 && ! this.cancelled) {
             printSate();
             try {
+                //noinspection BusyWait // because we're in a sperated thread
                 Thread.sleep((long) (this.delay * 1000));
             } catch (InterruptedException ignored) { }
         }
@@ -75,7 +92,7 @@ public class ProgressPrinter extends Thread {
     }
 
     public void printSate() {
-        ScriptCommands.logger.fine(prefix + round(progressPercent, digitsShown) + "% ");
+        CustomLogger.fine(prefix + round(progressPercent, digitsShown) + "% ");
     }
 
     /**
@@ -132,7 +149,7 @@ public class ProgressPrinter extends Thread {
 
     public void cancel() {
         this.cancelled = true;
-        System.out.println("Cancelled");
+        CustomLogger.info("Cancelled");
     }
 
     public int getDigitsShown() {

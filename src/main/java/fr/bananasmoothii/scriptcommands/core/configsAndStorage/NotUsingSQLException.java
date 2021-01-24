@@ -14,26 +14,15 @@
  *    limitations under the License.
  */
 
-package fr.bananasmoothii.scriptcommands.core.execution;
+package fr.bananasmoothii.scriptcommands.core.configsAndStorage;
 
-public class NoneType {
-	public static final NoneType INSTANCE = new NoneType();
-	
-	@Override
-	public boolean equals(Object o) {
-		return o instanceof NoneType;
-	}
-	
-	@Override
-	public int hashCode() {
-		return 1;
-	}
+public class NotUsingSQLException extends RuntimeException {
 
-	/**
-	 * @return "none", as in the ScriptLexer
-	 */
-	@Override
-	public String toString() {
-		return "none";
-	}
+    public NotUsingSQLException(String s) {
+        super(s);
+    }
+
+    public NotUsingSQLException() {
+        super();
+    }
 }

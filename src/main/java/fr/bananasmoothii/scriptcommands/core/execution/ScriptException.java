@@ -1,15 +1,36 @@
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package fr.bananasmoothii.scriptcommands.core.execution;
 
-import fr.bananasmoothii.scriptcommands.core.configs_storage.ScriptValueList;
+import fr.bananasmoothii.scriptcommands.core.CustomLogger;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.lang.reflect.Field;
+import java.sql.SQLException;
 
 /**
  * All exceptions from scripts will be this one with a name and optionally an error message.
  * @see ScriptException#invalidType making a basic invalid type faster
  */
 public class ScriptException extends RuntimeException {
-	/**
+
+    /**
 	 * for Better managing of exception types in the Scripts.
 	 * @see ScriptException
 	 */
@@ -17,19 +38,19 @@ public class ScriptException extends RuntimeException {
 		ASSERTION_ERROR("ASSERTION_ERROR"),
 		CONVERSION_ERROR("CONVERSION_ERROR"),
 		GLOBAL_NOT_ALLOWED("GLOBAL_NOT_ALLOWED"),
-		INDISPONIBLE_THREAD_NAME("INDISPONIBLE_THREAD_NAME"),
-		INVALID_ARG_NUMBER("INVALID_ARG_NUMBER"),
+		UNAVAILABLE_THREAD_NAME("UNAVAILABLE_THREAD_NAME"),
+		INVALID_ARGUMENTS("INVALID_ARGUMENTS"),
 		INVALID_OPERATOR("INVALID_OPERATOR"),
 		INVALID_TYPE("INVALID_TYPE"),
 		NOT_A_CONTAINER("NOT_A_CONTAINER"),
 		NOT_DEFINED("NOT_DEFINED"),
 		NOT_OVERRIDABLE("NOT_OVERRIDABLE"),
-		NOT_SUBSCRIPTABLE("NOT_SUBSCRIPTABLE"),
+		/** For example when you do {@code 10[1]}, it doesn't mean anything */
+		NOT_LISTABLE("NOT_LISTABLE"),
 		OUT_OF_BOUNDS("OUT_OF_BOUNDS"),
 		/** For errors that should not happen */
 		SHOULD_NOT_HAPPEN("SHOULD_NOT_HAPPEN"),
-		UNKNOWN("UNKNOWN"),
-		;
+		UNKNOWN("UNKNOWN");
 
 		private final String type;
 
@@ -47,13 +68,13 @@ public class ScriptException extends RuntimeException {
 	private String function;
 	private String funcArgs;
 
-	/**
+	/*
 	 * Same as {@link ScriptException#ScriptException(ExceptionType, String, String, String)} but with
 	 * <i>funcArgs</i> set to an empty string and
 	 * <i>message</i> set to {@code "<no further information>"}<br/>
 	 * Warning: providing no message is not recommended
 	 * @see ScriptException#getMessage()
-	 */
+	 *
 	public ScriptException(ExceptionType type, String function) {
 		this(type, function, null);
 	}
@@ -63,18 +84,28 @@ public class ScriptException extends RuntimeException {
 	 * <i>message</i> set to {@code null}<br/>
 	 * Warning: providing no message is not recommended
 	 * @see ScriptException#getMessage()
-	 */
+	 *
 	public ScriptException(ExceptionType type, String function, @Nullable String funcArgs) {
 		this(type, function, funcArgs, null);
 	}
+
+	 */
 
 	/**
 	 * Same as {@link ScriptException#ScriptException(ExceptionType, String, String, String)} but calls
 	 * {@link Types#getPrettyArgs(ScriptValueList)} on <strong>funcArgs</strong>
 	 */
-	public ScriptException(ExceptionType type, String function, @NotNull ScriptValueList<?> funcArgs,
-						   /*@Nullable*/ String message) {
+	public ScriptException(ExceptionType type, String function, @NotNull ScriptValueList<?> funcArgs, String message) {
 		this(type, function, Types.getPrettyArgs(funcArgs), message);
+	}
+
+
+	public ScriptException(ExceptionType exceptionType, Args args, String message) {
+		this(exceptionType, StackTraceUtils.getFromStackTrace(0), args, message);
+	}
+
+	public ScriptException(ExceptionType exceptionType, String function, Args args, String message) {
+		this(exceptionType, function, args.toString(), message);
 	}
 
 	/**
@@ -102,7 +133,7 @@ public class ScriptException extends RuntimeException {
 	 */
 	@Override
 	public String getMessage() {
-		return "Error \"" + type.toString() + "\" in " + function + "(" + funcArgs + ")" +
+		return "Script error \"" + type + "\" in " + function + "(" + funcArgs + ")" +
 				(super.getMessage() == null ? "" : ": " + super.getMessage());
 	}
 
@@ -126,6 +157,27 @@ public class ScriptException extends RuntimeException {
 
 	public void setFuncArgs(String funcArgs) {
 		this.funcArgs = funcArgs;
+	}
+
+	public void appendToMessage(String messageToAppend) {
+		appendToThrowableMessage(this, messageToAppend);
+	}
+
+	public static void appendToSQLExceptionQuery(SQLException sqlException, String query) {
+		appendToThrowableMessage(sqlException, " (SQL query: \"" + query + "\")");
+	}
+
+	/**
+	 * Uses reflection to append something to the detail message of an exception.
+	 */
+	public static void appendToThrowableMessage(Throwable throwable, String s) {
+		try {
+			Field field = Throwable.class.getDeclaredField("detailMessage");
+			field.setAccessible(true);
+			field.set(throwable, field.get(throwable) + s);
+		} catch (NoSuchFieldException | IllegalAccessException e) {
+			e.printStackTrace();
+		}
 	}
 
 	// ---- for making ScriptsExceptions faster ----
@@ -160,38 +212,101 @@ public class ScriptException extends RuntimeException {
 				String.format("excepted %s but got %s", excepted, gotTypes));
 	}
 	
-	public static ScriptException invalidOperator(String where, ScriptValue<?> left, String operator, ScriptValue<?> rigth) {
-		return new ScriptException(ExceptionType.INVALID_OPERATOR, where, "", "invalid operator '" + operator + "' between " + left.type + " and " + rigth.type +
-		(left.is("Dictionary") && operator.equals("+") && rigth.is("List") ? " because you can only add a list of two elements to a dictionary." :
-		(left.is("List") && operator.equals("-") && ! rigth.is("Integer") ? " because the left value must be an Integer." : ".")));
+	public static ScriptException invalidOperator(String where, ScriptValue<?> left, String operator, ScriptValue<?> right) {
+		return new ScriptException(ExceptionType.INVALID_OPERATOR, where, "", "invalid operator '" + operator + "' between " + left.type + " and " + right.type +
+		(left.is("Dictionary") && operator.equals("+") && right.is("List") ? " because you can only add a list of two elements to a dictionary." :
+		(left.is("List") && operator.equals("-") && ! right.is("Integer") ? " because the left value must be an Integer." : ".")));
 	}
 
-
+	/*
 	public static void checkArgsNumber(int minArgs, ScriptValueList<?> args) {
 		if (args.size() < minArgs)
-			throw new ScriptException(ExceptionType.INVALID_ARG_NUMBER,
+			throw new ScriptException(ExceptionType.INVALID_ARGUMENTS,
 					StackTraceUtils.getFromStackTrace(0),
 					Types.getPrettyArgs(args),
 					"too few arguments, excepted at least " + minArgs + " but got " + args.size());
 	}
 
-	public static void checkArgsNumber(int minArgs, int maxArgs, ScriptValueList<?> args) {
-		checkArgsNumber(minArgs, maxArgs, args, 0);
+	public static void checkArgsNumber(int minArgs, int maxArgs, Args args) {
+		checkArgsNumber(minArgs, maxArgs, args, StackTraceUtils.getFromStackTrace(0));
 	}
 
-	public static void checkArgsNumber(int minArgs, int maxArgs, ScriptValueList<?> args, int depth) {
-		if (args.size() < minArgs || args.size() > maxArgs)
-			throw new ScriptException(ExceptionType.INVALID_ARG_NUMBER,
-					StackTraceUtils.getFromStackTrace(depth),
+	public static void checkArgsNumber(int minArgs, int maxArgs, Args args, String funcName) {
+		if (args.getArgsList().size() < minArgs || args.getArgsList().size() > maxArgs)
+			throw new ScriptException(ExceptionType.INVALID_ARGUMENTS,
+					funcName,
 					Types.getPrettyArgs(args),
 					"too few arguments, excepted from " + minArgs + " to " + maxArgs + " but got " + args.size());
 	}
+	*/
 	
-	public static void shouldHaveNoArgs(String variable, ScriptValueList<?> args) {
-		if (args.size() > 0) {
-			System.out.println("WARNING: You called the variable " + variable + " with arguments (" + Types.getPrettyArgs(args) + ") but you shouldn't.\n" +
+	public static void shouldHaveNoArgs(String variable, Args args) {
+		if (! args.isEmpty()) {
+			CustomLogger.warning("You called the variable " + variable + " with arguments (" + args.toString() + ") but you shouldn't.\n" +
 			                   "doing as if there where no args");
 		}
+	}
+
+	/**
+	 * @see #toScriptException(Throwable, int, String)
+	 */
+	public static ScriptException toScriptException(Throwable exception) {
+		return toScriptException(exception, 1);
+	}
+
+	/**
+	 * @see #toScriptException(Throwable, int, String)
+	 */
+	public static ScriptException toScriptException(Throwable exception, int depth) {
+		return toScriptException(exception, depth, null);
+	}
+
+	/**
+	 * Converts any {@link Throwable} in {@link ScriptException} as {@linkplain ExceptionType#SHOULD_NOT_HAPPEN SHOULD_NOT_HAPPEN}
+	 * @param exception the base exception
+	 * @param depth to know what function is problematic
+	 * @param appendix (nullable) for directly adding something to the error message
+	 * @return a new constructed {@link ScriptException}
+	 */
+	public static ScriptException toScriptException(Throwable exception, int depth, @Nullable String appendix) {
+		ScriptException e = new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, StackTraceUtils.getFromStackTrace(depth), "",
+				"Inner SQL error: " + exception.getMessage() + (appendix == null ? "" : appendix));
+		e.setStackTrace(exception.getStackTrace());
+		return e;
+
+		/*StringBuilder errorTrace = new StringBuilder();
+		errorTrace.append('\n');
+		for (StackTraceElement stackTraceElement: exception.getStackTrace()) {
+			errorTrace.append(stackTraceElement.toString())
+					.append('\n');                                                     // what's that shit ??????
+		}
+		return (ScriptException) new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, StackTraceUtils.getFromStackTrace(depth), "",
+				"Inner SQL error: " + exception.getMessage() +
+				"\nReal stack trace is between these line:\n-----------------------------------\n" +
+				exception.getClass().getName() + ": " + exception.getMessage() + "\n" + errorTrace +
+				"-----------------------------------\n\"wrong\" stack trace (you don't need to copy it):").initCause(exception);
+
+		 */
+	}
+
+	/**
+	 * @see ScriptException#toScriptException(SQLException, int, String)
+	 */
+	public static ScriptException toScriptException(SQLException exception, String query) {
+		return toScriptException(exception, 1, query);
+	}
+
+	/**
+	 * Similar to {@link ScriptException#toScriptException(Throwable, int, String)} but with {@code " (SQL query: " + query + ")"} as appendix
+	 */
+	public static ScriptException toScriptException(SQLException exception, int depth, String query) {
+		return toScriptException((Throwable) exception, depth + 1, " (SQL query: \"" + query + "\")");
+	}
+
+
+	public static <O> O requireNonNullElseThrow(O obj, RuntimeException runtimeException) {
+		if (obj == null) throw runtimeException;
+		return obj;
 	}
 	
 }

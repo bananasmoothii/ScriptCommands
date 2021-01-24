@@ -14,26 +14,13 @@
  *    limitations under the License.
  */
 
-package fr.bananasmoothii.scriptcommands.core.execution;
+package fr.bananasmoothii.scriptcommands.core.configsAndStorage;
 
-public class NoneType {
-	public static final NoneType INSTANCE = new NoneType();
-	
-	@Override
-	public boolean equals(Object o) {
-		return o instanceof NoneType;
-	}
-	
-	@Override
-	public int hashCode() {
-		return 1;
-	}
-
-	/**
-	 * @return "none", as in the ScriptLexer
-	 */
-	@Override
-	public String toString() {
-		return "none";
-	}
+public class InvalidConfigException extends RuntimeException {
+    public InvalidConfigException(String message) {
+        super(message + "\nThe plugin will shut down, if you want to regenerate a new working configuration file, delete or rename the current one.");
+    }
+    public InvalidConfigException(String message, Throwable cause) {
+        super(message + "\nThe plugin will shut down, if you want to regenerate a new working configuration file, delete or rename the current one.", cause);
+    }
 }

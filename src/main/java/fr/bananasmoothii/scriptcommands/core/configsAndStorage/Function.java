@@ -14,26 +14,16 @@
  *    limitations under the License.
  */
 
-package fr.bananasmoothii.scriptcommands.core.execution;
+package fr.bananasmoothii.scriptcommands.core.configsAndStorage;
 
-public class NoneType {
-	public static final NoneType INSTANCE = new NoneType();
-	
-	@Override
-	public boolean equals(Object o) {
-		return o instanceof NoneType;
-	}
-	
-	@Override
-	public int hashCode() {
-		return 1;
-	}
+import fr.bananasmoothii.scriptcommands.core.execution.ScriptsParsingException;
 
-	/**
-	 * @return "none", as in the ScriptLexer
-	 */
-	@Override
-	public String toString() {
-		return "none";
-	}
+import java.io.IOException;
+import java.util.HashMap;
+
+public class Function extends ContainingScripts {
+
+    public Function(String name, HashMap<String, Object> hashMap) throws IOException, ScriptsParsingException {
+        super(name, hashMap, "functions");
+    }
 }

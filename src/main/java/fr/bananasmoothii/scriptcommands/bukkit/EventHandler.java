@@ -14,26 +14,11 @@
  *    limitations under the License.
  */
 
-package fr.bananasmoothii.scriptcommands.core.execution;
+package fr.bananasmoothii.scriptcommands.bukkit;
 
-public class NoneType {
-	public static final NoneType INSTANCE = new NoneType();
-	
-	@Override
-	public boolean equals(Object o) {
-		return o instanceof NoneType;
-	}
-	
-	@Override
-	public int hashCode() {
-		return 1;
-	}
+import fr.bananasmoothii.scriptcommands.core.execution.Context;
+import org.bukkit.event.Listener;
 
-	/**
-	 * @return "none", as in the ScriptLexer
-	 */
-	@Override
-	public String toString() {
-		return "none";
-	}
+public class EventHandler implements Listener {
+
 }

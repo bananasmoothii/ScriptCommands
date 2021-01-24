@@ -1,7 +1,22 @@
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package fr.bananasmoothii.scriptcommands.core.execution;
 
-import fr.bananasmoothii.scriptcommands.core.antlr4parsing.PermissionBaseVisitor;
-import fr.bananasmoothii.scriptcommands.core.antlr4parsing.PermissionParser;
+import fr.bananasmoothii.scriptcommands.core.antlr4parsing.*;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.bukkit.permissions.Permissible;
@@ -10,7 +25,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 
 public class PermissionExecutor extends PermissionBaseVisitor<Boolean> {
-    private Permissible player;
+    private final Permissible player;
 
     public PermissionExecutor(Permissible player) {
         this.player = player;
@@ -39,9 +54,7 @@ public class PermissionExecutor extends PermissionBaseVisitor<Boolean> {
      */
     @Override
     public Boolean visitRealPermission(PermissionParser.RealPermissionContext ctx) {
-        System.out.println("checking if player has " + ctx.getText() + " (first try)");
         if (player.hasPermission(ctx.getText())) {
-            System.out.println("yes");
             return true;
         }
         ArrayList<String> permissionWords = new ArrayList<>();
@@ -50,13 +63,10 @@ public class PermissionExecutor extends PermissionBaseVisitor<Boolean> {
         }
         while (permissionWords.size() > 0) {
             permissionWords.remove(permissionWords.size() - 1);
-            System.out.println("checking if player has " + joinWithEnd(permissionWords) + "*");
             if (player.hasPermission(joinWithEnd(permissionWords) + "*")) {
-                System.out.println("yes");
                 return true;
             }
         }
-        System.out.println("no");
         return false;
     }
 
@@ -79,7 +89,7 @@ public class PermissionExecutor extends PermissionBaseVisitor<Boolean> {
         return visit(b);
     }
 
-    private String joinWithEnd(ArrayList<String> list) {
+    private static String joinWithEnd(ArrayList<String> list) {
         StringBuilder result = new StringBuilder();
         for (String string: list) {
             result.append(string)

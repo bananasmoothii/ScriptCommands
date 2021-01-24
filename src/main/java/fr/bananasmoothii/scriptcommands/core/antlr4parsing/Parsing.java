@@ -1,6 +1,22 @@
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package fr.bananasmoothii.scriptcommands.core.antlr4parsing;
 
-import fr.bananasmoothii.scriptcommands.bukkit.ScriptCommands;
+import fr.bananasmoothii.scriptcommands.core.CustomLogger;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptsParsingException;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -12,6 +28,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import static fr.bananasmoothii.scriptcommands.core.CustomLogger.mainLogger;
 
 public class Parsing {
 
@@ -29,7 +46,7 @@ public class Parsing {
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         ScriptsParser parser = new ScriptsParser(tokens);
         ScriptsParser.StartContext context = parser.start();
-        if (context.exception != null || ScriptCommands.logger.getLevel().intValue() <= 300) {
+        if (context.exception != null || CustomLogger.getLevel().intValue() <= 300) {
             if (dumper == null)
                 dumper = new ParserDumper();
             dumper.dumpParsing(name, scripts, lexer, parser, context);
@@ -68,7 +85,7 @@ public class Parsing {
                         if (matcher.group(3) != null)
                             linesFromConfig.set(i, String.format("%s(f\"%s\", [%s])",
                                     matcher.group(1), replaceQuotesExceptInPlaceholder(matcher.group(4)),
-                                    matcher.group(3) == null ? "" : matcher.group(3)));
+                                    matcher.group(3)));
                         else
                             linesFromConfig.set(i, String.format("%s(f\"%s\")",
                                     matcher.group(1), replaceQuotesExceptInPlaceholder(matcher.group(4))));
@@ -116,7 +133,6 @@ public class Parsing {
 
             before = current;
         }
-        System.out.println("replaced: " + string + " -> " + sb);
         return sb.toString();
     }
 }

@@ -16,24 +16,10 @@
 
 package fr.bananasmoothii.scriptcommands.core.execution;
 
-public class NoneType {
-	public static final NoneType INSTANCE = new NoneType();
-	
-	@Override
-	public boolean equals(Object o) {
-		return o instanceof NoneType;
-	}
-	
-	@Override
-	public int hashCode() {
-		return 1;
-	}
+import java.lang.annotation.*;
 
-	/**
-	 * @return "none", as in the ScriptLexer
-	 */
-	@Override
-	public String toString() {
-		return "none";
-	}
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Target({ElementType.METHOD})
+public @interface ScriptFunctionMethod {
 }

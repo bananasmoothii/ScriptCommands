@@ -1,3 +1,19 @@
+/*
+ *    Copyright 2020 ScriptCommands
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package fr.bananasmoothii.scriptcommands.core.execution;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -13,27 +29,37 @@ public class ScriptThread extends Thread {
     private final @Nullable ScriptValue<?> id;
     private static final HashMap<ScriptValue<?>, ScriptThread> threads = new HashMap<>();
     private ScriptsExecutor scriptsExecutor;
+    private static int threadsNb = 0;
 
-    public ScriptThread(@NotNull Context context, @NotNull ParserRuleContext ctxToExecute) throws InvalidNameException {
-        this(context, ctxToExecute, null);
+    public ScriptThread(@NotNull Context context, @NotNull ParserRuleContext ctxToExecute) {
+        super();
+        this.context = context.clone(); // if it wouldn't be cloned, it would force the user to make separate variables if two thread are doing the same thing...
+        this.ctxToExecute = ctxToExecute;
+        id = new ScriptValue<>(super.getName());
+        threads.put(id, this);
     }
 
     public ScriptThread(@NotNull Context context, @NotNull ParserRuleContext ctxToExecute, @Nullable ScriptValue<?> id) throws InvalidNameException {
-        super(verifyNameDisponibility(id.toString()));
-        this.context = context.clone();
+        super(verifyNameAvailability(getValidID(id)).toString());
+        this.context = context.clone(); // if it wouldn't be cloned, it would force the user to make separate variables if two thread are doing the same thing...
         this.ctxToExecute = ctxToExecute;
         this.id = id;
-        System.out.println("new ScriptThread !");
+        threads.put(id, this);
     }
 
-    public static String verifyNameDisponibility(String name) throws InvalidNameException {
-        if (! isDisponibleName(name))
+    public static ScriptValue<?> verifyNameAvailability(ScriptValue<?> id) throws InvalidNameException {
+        if (! isAvailableName(id))
             throw new InvalidNameException();
-        return name;
+        return id;
     }
 
-    public static boolean isDisponibleName(String name) {
-        return ! threads.containsKey(name);
+    public static boolean isAvailableName(ScriptValue<?> id) {
+        return ! threads.containsKey(new ScriptValue<>(id));
+    }
+
+    private static @NotNull ScriptValue<?> getValidID(@Nullable ScriptValue<?> id) {
+        if (id != null) return id;
+        return new ScriptValue<>("ScriptCommands-thread-" + threadsNb++);
     }
 
     /**
@@ -51,5 +77,13 @@ public class ScriptThread extends Thread {
 
     public void forceReturn() {
         scriptsExecutor.forceReturn();
+    }
+
+    public ScriptValue<?> getScriptValueId() {
+        return id;
+    }
+
+    public static ScriptThread getFromId(ScriptValue<?> id) {
+        return threads.get(id);
     }
 }

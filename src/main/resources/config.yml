@@ -1,6 +1,9 @@
 # don't touch
 config-version: 0.1
 
+# how the plugin will update: can be "auto", "ask" or "no". TODO !
+update: auto
+
 # I recommend letting that on false.
 do-not-register-commands: false
 
@@ -10,22 +13,22 @@ log-level: FINEST
 # if you can't manage to log levels below INFO, I can log them as INFO and write the actual level behind.
 log-through-info: true
 
-# make every "do" section as scripts, so you do not need yo specify "script" each time. For other types, use console(format("say ""{=player}"""))
+# make every "do" section as scripts, so you do not need yo specify "script" each time. For other types, use console(f"say {=player}")
 direct-scripts: false
 
 storage:
-  # can be "json", "SQLite" or "MySQL"
+  # can be "json", "SQLite" or "MySQL" (case sensitive)
   method: json
 
   json:
-    file-location: plugin/ScriptCommands/storage.json
+    file-location: plugins/ScriptCommands/storage.json
     
     # interval in number of modification of any global variable (or any item in a list or dictionary) the plugin will wait for until to saveAndClose everything in the storage file.
     # if your scripts aren't touching global variables a lot, I would recommend letting that on 1 (saveAndClose each 1 modification, so each time) so you won't lose anything if the server crash,
     # but if you're constantly modifying these variables, it can unnecessarily take lots of resources by generating a new file each time.
     save-interval: 1
   SQLite:
-    file-location: plugin/ScriptCommands/storage.db
+    file-location: plugins/ScriptCommands/storage.db
     table-prefix: 'SC_'
   MySQL:
     hostname: ''
@@ -34,7 +37,7 @@ storage:
     user: ''
     password: ''
     table-prefix: 'SC_'
-    #flags: "?allowReconnect=true" # I don't really know how that works right now soo...
+    #flags: '?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC'
 
 messages:
   bad-args: 'player_msg &cBad arguments count, there should be &e{command.minArgs}&c to &e{maxArgs(command)}&c. (You put &e{args.count}&c)'
@@ -57,8 +60,8 @@ commands:
     aliases:
     - st
     - sometest
-    # from 2 to what you want. possible values examples here: "3", "->10", "1->2", "9->"
-    args: 2->
+    # from 2 to what you want. possible values examples here: "3", "-10", "1-2", "9-"
+    args: 2-
     cost: 1
     # default is false
     confirm: true
@@ -69,56 +72,58 @@ commands:
       - script a1 = log (111.111 * -2)
       - script b = 2
 
-      - 'player_run Hello everyone ! {=player} {=player->getDisplayName} {=(args[1:]->join(" ") + "u u u")->split(" ")} {=papi("some placeholder")}'
-      - player_run /spawn
+      - 'player_cmd Hello everyone ! {=player} {=player.getDisplayName} {=(args[1:].join(" ") + "u u u").split(" ")} {=papi("some placeholder")}'
+      - player_cmd /spawn
       - player_msg You got teleported
-      - player_msg<randChoice(["Bananasmoothii", "Dryter97"])> Hi ! {=random01()} {=randInt(2, 5)} {=randChoice(totalPlayerList->addList(offlinePlayerList))} {=onlinePlayerList}
+      - player_msg<randChoice(["Bananasmoothii", "Dryter97"])> Hi ! {=random01()} {=randInt(2, 5)} {=randChoice(totalPlayerList.addList(offlinePlayerList))} {=onlinePlayerList}
       - console_msg {=args[0]}
-      - console say hello {=player->displayname} {=args[0]} {args[0]} # = (first arg) {args[0]}
+      - console_cmd say hello {=player.displayname} {=args[0]} {args[0]} # = (first arg) {args[0]}
       - script console_msg("aa bb cc")
       - script toText(5)
       - console_msg abc \{=ici}
       
-      - player_run /say {=args[0:]} # take first element of list args
-      - script if args->count >= 5 {
-      - script global varA = 56 + 7 / 8 * 3 ^ 2 // log 2 % 3 - 8 + (3 / 4) * round(10 / 3, 2) + "5.75"->toNumber + 5.5->toString->toDecimal
-      - player_run /say {=args[4:5]} {=varA}
+      - player_cmd /say {=args[0:]} # take first element of list args
+      - script if args.count >= 5 {
+      - script global varA = 56 + 7 / 8 * 3 ^ 2 // log 2 % 3 - 8 + (3 / 4) * round(10 / 3, 2) + "5.75".toNumber + 5.5.toString.toDecimal
+      - player_cmd /say {=args[4:5]} {=varA}
       - script }
-      - script elif args[0]->type == "Text" {
+      - script elif args[0].type == "Text" {
       - player_msg first arg is text
-      - script if args[1]->isNumber and (args[1]->isInteger or args[1]->isDecimal) {
+      - script if args[1].isNumber and (args[1].isInteger or args[1].isDecimal) {
       - player_msg<player> and second is a number
       - script } varB = [12, 6.3, "7272n", [1, 2, 3.0, "b"]]
-      - player_run /test
+      - player_cmd /test
       - script }
-      - 'player_msg varB: {=varB->join(" and ")} {=log 1->thing(3, 5, "7")}'
+      - 'player_msg varB: {=varB.join(" and ")} {=log 1.thing(3, 5, "7")}'
         
       - script varC = [22]
-      - script for i in range(8)->addList(args) {
-      - script varC->add(i)
+      - script for i in range(8).addList(args) {
+      - script varC.add(i)
       - script continue }  # unuseful
       - script while true {
       - script break} # unuseful too 
-      - script return varC->toText
+      - script return varC.toText
       - player_msg this won't be executed
       
-      - script for a in b->c {if d {while e{console_msg(f)
+      - script for a in b.c {if d {while e{console_msg(f)
       - script if g{} elif h{} elif not j{} else {a == b ? b else c}}}}
       
       - script try {
-      - script "a"->toInteger } catch err = "INVALID_TYPE" { }
+      - script "a".toInteger } catch err = "INVALID_TYPE" { }
 
   commandsThatMakeSense:
     script:
+      - player_msg<"Bananasmoothii"> hi Banana !
       - script my_list = ["a", 1, "w"]
       - script log my_list
       - script added_thing = 2
       - script copy = my_list
-      - script my_list -> add(added_thing)
+      - script my_list.add(added_thing)
       - console_msg added {=added_thing}
       - script log my_list
       - script log copy
-      - console_msg everything worked !
+      - console_msg everything worked if copy doesn't contains 2 # TODO: fix
+      - 'script assert my_list == ["a", 1, "w", 2] : "add didn''t worked"'
       - script try {
       - script throw "BIG_THING"
       - console_msg didn't worked...
@@ -128,30 +133,30 @@ commands:
 
   sometests2:
     script:
-      - player /say {=args[0:]} # take first element of list args
+      - player_cmd /say {=args[0:]} # take first element of list args
       
-      - script if args->count >= 5 {
-      - script varA = 56 + 7 / 8 * 3 ^ 2 // 2 % 3 - 8 + (3 / 4) * round(10 / 3, 2) + "5.75"->toDecimal + 5.5->toText("a")->toDecimal()
-      - player_run /say {=args[4:5]} {=varA}
-      - script } elif args[0]->type == "Text" {
+      - script if args.count >= 5 {
+      - script varA = 56 + 7 / 8 * 3 ^ 2 // 2 % 3 - 8 + (3 / 4) * round(10 / 3, 2) + "5.75".toDecimal + 5.5.toText("a").toDecimal()
+      - player_cmd /say {=args[4:5]} {=varA}
+      - script } elif args[0].type == "Text" {
       - player_msg first arg is text
 
-      - script if args[1]->isNumber and (args[1]->isInteger or args[1]->isDecimal) {
+      - script if args[1].isNumber and (args[1].isInteger or args[1].isDecimal) {
       - player_msg<player> and second is a number
       - script } varB = [12, 6.3, "7272n", log [1, 2, 3.0, "b"]] }
-      - 'player_msg varB: {=varB->join(" and ")} {=1->thing(3, 5, "7")}'
+      - 'player_msg varB: {=varB.join(" and ")} {=1.thing(3, 5, "7")}'
 
 functions:
   
-  thing: 
+  thing: # TODO: should be thing(mandatory1, mandatory2 | not_mandatory3, not_mandatory4, *everything_else)
     script:
       - script varC = [22]
-      - script for i in range(8)->addList(args) {
-      - script varC->add(i)
+      - script for i in range(8).addList(args) {
+      - script varC.add(i)
       - script continue }  # unuseful
       - script while true {
       - script break} # unuseful too 
-      - script return varC->toText
+      - script return varC.toText
       - player_msg this won't be executed
 
 schedules:
@@ -163,20 +168,20 @@ schedules:
     direct-scripts: false
   
     script:
-      - console_run say Hello everyone !!!!
+      - console_cmd say Hello everyone !!!!
 
   - interval: 123 # cannot be decimal.
     start-delay: 75
     
     script:
       - script if dayOfWeek in [1, 3, 5, 7] and monthOfYear != 12 {
-      - console say hello everyone ! Get a dirt !
-      - console minecraft:give @a dirt 1
+      - console_cmd say hello everyone ! Get a dirt !
+      - console_cmd minecraft:give @a dirt 1
       - script }
 
 events:
   
-  blockPlaceEvent:
-    #direct-scripts: true # can be specified pretty much everywhere
+  server_start:
+    #direct-scripts: false # can be specified pretty much everywhere
     script:
-      - console_run eco take {=player} 1
+      - console_cmd say HEY HEY HEY HEY

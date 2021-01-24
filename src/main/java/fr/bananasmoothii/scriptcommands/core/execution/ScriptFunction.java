@@ -16,24 +16,21 @@
 
 package fr.bananasmoothii.scriptcommands.core.execution;
 
-public class NoneType {
-	public static final NoneType INSTANCE = new NoneType();
-	
-	@Override
-	public boolean equals(Object o) {
-		return o instanceof NoneType;
-	}
-	
-	@Override
-	public int hashCode() {
-		return 1;
-	}
+/**
+ * This class will contain every function. You can use it for registering functions
+ * in {@link Context#registerScriptFunction(String, ScriptFunction, Args.NamingPattern)}.
+ */
+@FunctionalInterface
+public interface ScriptFunction {
 
-	/**
-	 * @return "none", as in the ScriptLexer
-	 */
-	@Override
-	public String toString() {
-		return "none";
-	}
+    ScriptValue<Object> run(Args args);
+
+    class InvalidMethodException extends RuntimeException {
+        public InvalidMethodException() {
+            super();
+        }
+        public InvalidMethodException(String message) {
+            super(message);
+        }
+    }
 }

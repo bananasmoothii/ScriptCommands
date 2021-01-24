@@ -16,24 +16,15 @@
 
 package fr.bananasmoothii.scriptcommands.core.execution;
 
-public class NoneType {
-	public static final NoneType INSTANCE = new NoneType();
-	
-	@Override
-	public boolean equals(Object o) {
-		return o instanceof NoneType;
-	}
-	
-	@Override
-	public int hashCode() {
-		return 1;
-	}
+import java.lang.annotation.*;
 
-	/**
-	 * @return "none", as in the ScriptLexer
-	 */
-	@Override
-	public String toString() {
-		return "none";
-	}
+/**
+ * This annotation is for <strong>public static final</strong> fields of type {@link fr.bananasmoothii.scriptcommands.core.execution.Args.NamingPattern}.
+ * It will be used by {@link Context#registerMethodsFromObject(Object)} for making a
+ * {@link fr.bananasmoothii.scriptcommands.core.execution.Args.NamingPattern} only once.
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Target(ElementType.FIELD)
+public @interface NamingPatternProvider {
 }
