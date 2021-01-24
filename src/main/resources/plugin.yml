@@ -1,0 +1,8 @@
+name: ScriptCommands
+version: ${project.version}
+main: fr.bananasmoothii.scriptcommands.bukkit.ScriptCommands
+api-version: 1.16
+prefix: ScriptComands
+authors: [ Bananasmoothii ]
+description: ScriptCommands allows you to make commands very easily using scripts. You can do a lot using the scripts, even replace plugins. Just read the wiki at https://github.com/bananasmoothii/ScriptCommands/wiki
+website: https://github.com/bananasmoothii/ScriptCommands/wiki
