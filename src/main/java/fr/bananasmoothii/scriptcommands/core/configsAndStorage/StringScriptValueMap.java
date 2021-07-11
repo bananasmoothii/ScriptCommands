@@ -241,7 +241,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
             ResultSet rs = Storage.executeSQLQuery(query);
             while (rs.next()) {
                 byte type = rs.getByte(2);
-                if (type != value1.typeByte) continue;
+                if (type != value1.type.asByte) continue;
                 ScriptValue<?> objectTested = ScriptValueCollection.transformToScriptValue(rs.getString(1), type);
                 if (objectTested.equals(value1)) return true;
             }

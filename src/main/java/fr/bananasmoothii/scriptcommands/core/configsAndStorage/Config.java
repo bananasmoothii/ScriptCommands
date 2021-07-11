@@ -25,9 +25,7 @@ import org.jetbrains.annotations.Nullable;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.error.YAMLException;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 import java.util.logging.Level;
 
@@ -46,6 +44,8 @@ public abstract class Config {
 
     protected static String missingThing;
 
+    public static String configPath = "plugins/ScriptCommands/config.yml";
+
     /**
      * Not thread-safe
      * @param createConfig a {@link Runnable} that will be used in case if the config was not found.
@@ -54,41 +54,21 @@ public abstract class Config {
 
         Yaml yamlParser = new Yaml();
 
-        File file = new File("plugins/ScriptCommands/config.yml");
+        File file = new File(configPath);
 
         CustomLogger.config("deleting config file");
         //noinspection ResultOfMethodCallIgnored
         file.delete(); // TODO: remove this line because this is just for testing.
 
-        Scanner sc;
         try {
-            sc = new Scanner(file);
-        } catch (FileNotFoundException e) {
-            CustomLogger.info("Config file not found. Creating a new one...");
-            createConfig.run();
-            try {
-                sc = new Scanner(file);
-            } catch (FileNotFoundException e1) {
-                CustomLogger.severe("Unable to generate a config file:");
-                e1.printStackTrace();
-                return;
+            missingThing = "the hole configuration";
+            if (! file.exists()) {
+                CustomLogger.info("Config file not found. Creating a new one...");
+                createConfig.run();
             }
-        }
-        ArrayList<String> listLines = new ArrayList<>();
-        while (sc.hasNextLine()) {
-            listLines.add(sc.nextLine());
-        }
-        sc.close();
-        try {
-            /*
-            TODO: try with this when it's working:
-                InputStream inputStream = this.getClass()
-                    .getClassLoader()
-                    .getResourceAsStream("customer.yaml");
-                    Map<String, Object> obj = yaml.load(inputStream);
-             */
-            missingThing = "a valid config";
-            rawData = yamlParser.load(String.join("\n", listLines));
+            if (! file.exists())
+                CustomLogger.severe("Unable to generate the config file");
+            rawData = yamlParser.load(new FileReader(file));
 
             missingThing = "config-version";
             assert rawData.containsKey("config-version");
@@ -190,9 +170,9 @@ public abstract class Config {
             throw new InvalidConfigException("The config file is not a valid YAML file. Try to test it with online tools such as http://www.yamllint.com/ . Here is the problem:\n"
                     + e.getMessage() + "\nIf you want to get a fresh new config file, delete or rename the current one.");
         }
-        catch (NullPointerException | AssertionError | ClassCastException | IllegalArgumentException e) {
-            throw new InvalidConfigException(missingThing + " is missing to the configuration, not valid, or there was an other error.\nError (note: there is always an error): "
-                    + e.getClass().getName() + ": " + e.getMessage() );
+        catch (NullPointerException | AssertionError | ClassCastException | IllegalArgumentException | FileNotFoundException e) {
+            throw (InvalidConfigException) new InvalidConfigException(missingThing + " is missing to the configuration, not valid, or there was an other error.\nError (note: there is always an error): "
+                    + e.getClass().getName() + ": " + e.getMessage() ).initCause(e);
         }
     }
 

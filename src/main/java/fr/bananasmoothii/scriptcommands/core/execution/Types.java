@@ -17,8 +17,11 @@
 package fr.bananasmoothii.scriptcommands.core.execution;
 
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.Map.Entry;
 
 /**
@@ -43,6 +46,23 @@ public class Types {
 			formattedArgs.add(getPrettyArg(arg));
 		}
 		return String.join(", ", formattedArgs);
+	}
+
+	public static String getPrettyArgs(@Nullable ScriptValueList<Object> args, @Nullable StringScriptValueMap<Object> kwargs) {
+		ArrayList<String> formattedArgs = new ArrayList<>();
+		if (kwargs != null && kwargs.size() != 0) {
+			for (Entry<String, ScriptValue<Object>> entry : kwargs.entrySet()) {
+				formattedArgs.add(entry.getKey() + " = " + getPrettyArg(entry.getValue()));
+			}
+			if (args != null && args.size() != 0) {
+				return getPrettyArgs(args) + ", " + String.join(", ", formattedArgs);
+			}
+			return String.join(", ", formattedArgs);
+		}
+		if (args != null && args.size() != 0) {
+			return getPrettyArgs(args);
+		}
+		return "";
 	}
 
 	/**

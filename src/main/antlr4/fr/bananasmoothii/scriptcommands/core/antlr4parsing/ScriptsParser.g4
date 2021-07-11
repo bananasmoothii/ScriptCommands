@@ -16,10 +16,6 @@
 
 parser grammar ScriptsParser;
 
-@header {
-package fr.bananasmoothii.scriptcommands.core.antlr4parsing;
-}
-
 options {
     tokenVocab=ScriptsLexer;
 }

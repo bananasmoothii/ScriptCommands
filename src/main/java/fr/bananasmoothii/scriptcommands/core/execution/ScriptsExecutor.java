@@ -33,6 +33,8 @@ import javax.naming.InvalidNameException;
 
 import java.util.*;
 
+import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.*;
+
 @SuppressWarnings("unchecked")
 public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { // should only implement ScriptsVisitor
 	
@@ -115,101 +117,15 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		return NONE;
 	}
 
-	/**
-	 * A class just for the function {@link ScriptsExecutor#visitFor_block(ScriptsParser.For_blockContext)}
-	 */
-	public static class ScriptValueIntegerIterator implements Iterator<ScriptValue<Integer>> {
-
-		private int start; // start is used as current value
-		private final int stop, step;
-
-		public ScriptValueIntegerIterator(int start, int stop, int step) {
-			this.start = start;
-			this.stop = stop;
-			this.step = step;
-		}
-
-		/*
-		public ScriptValueIntegerIterator(ScriptValueList<?> args) {
-			for (ScriptValue<?> arg: args) {
-				if (!arg.isNumber()) throw ScriptException.invalidType("range", "Decimals or Integers", args);
-			}
-			start = 0;
-			step = 1;
-			if (args.size() == 1) stop = args.get(0).asInteger();
-			else {
-				start = args.get(0).asInteger();
-				stop = args.get(1).asInteger();
-				if (args.size() == 3) step = args.get(2).asInteger();
-			}
-		}
-		*/
-
-		@Override
-		public boolean hasNext() {
-			return start < stop;
-		}
-
-		@Override
-		public ScriptValue<Integer> next() {
-			int ret = start;
-			start += step;
-			return new ScriptValue<>(ret);
-		}
-	}
-
-	/**
-	 * A class just for the function {@link ScriptsExecutor#visitFor_block(ScriptsParser.For_blockContext)}
-	 */
-	public static class ScriptValueDoubleIterator implements Iterator<ScriptValue<Double>> {
-
-		private double start;
-		private final double stop, step;
-
-		public ScriptValueDoubleIterator(double start, double stop, double step) {
-			this.start = start;
-			this.stop = stop;
-			this.step = step;
-		}
-
-		@Override
-		public boolean hasNext() {
-			return start < stop;
-		}
-
-		@Override
-		public ScriptValue<Double> next() {
-			double ret = start;
-			start += step;
-			return new ScriptValue<>(ret);
-		}
-	}
-
-	private static final Args.NamingPattern rangeNP = new Args.NamingPattern()
-			.setNamingPattern(1, "stop")
-			.setNamingPattern("start", "stop", "step")
-			.setDefaultValue("start", 0)
-			.setDefaultValue("step", 1);
-
 	@Override
 	public ScriptValue<NoneType> visitFor_block(ScriptsParser.For_blockContext ctx) {
-		Iterator<ScriptValue<?>> iterator;
+		Iterator<ScriptValue<?>> iterator = null;
 		if (ctx.expression().expression_part().function().size() == 1 &&
-				ctx.expression().expression_part().function(0).get_from_list().size() == 0 &&
-				ctx.expression().expression_part().function(0).VARIABLE().getText().equals("range")) {
-			Args args = visitArgs(ctx.expression().expression_part().function(0).arguments())
-					.setNamingPattern(rangeNP);
-			//ScriptException.checkArgsNumber(1, 3, args, "range");  // making a custom iterator for not having to first create the hole list. This can be considered as cheating lol
-			ScriptValue<?> start = args.getArg("start"),
-					       stop  = args.getArg("stop"),
-					       step  = args.getArg("step");
-			boolean allInt = start.is("Integer") && stop.is("Integer") && step.is("Integer");
-			if (allInt) //noinspection rawtypes
-				iterator = (Iterator<ScriptValue<?>>) (Iterator) new ScriptValueIntegerIterator(start.asInteger(), stop.asInteger(), step.asInteger()); // messy but best way //TODO: test
-			else //noinspection rawtypes
-				iterator = (Iterator<ScriptValue<?>>) (Iterator) new ScriptValueDoubleIterator(start.asDouble(), stop.asDouble(), step.asDouble());
-		} else {
-			ScriptValue<?> exprToIterate = visitExpression(ctx.expression());
+				ctx.expression().expression_part().function(0).get_from_list().size() == 0)
+			iterator = Context.getIterator(ctx.expression().expression_part().function(0).VARIABLE().getText(),
+					visitArgs(ctx.expression().expression_part().function(0).arguments()));
+		if (iterator == null) {
+			ScriptValue<Object> exprToIterate = (ScriptValue<Object>) visitExpression(ctx.expression());
 			iterator = exprToIterate.iterator(ctx.FOR().getText() + " " + ctx.VARIABLE().getText() +
 					" " + ctx.IN().getText() + " " + ctx.expression().getText() + " {...}");
 		}
@@ -247,13 +163,13 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 				List<ScriptsParser.ExpressionContext> expressions = catchCtx.expression();
 				for (int i = 0; i < expressions.size(); i++) {
 					ScriptValue<?> expr = visitExpression(expressions.get(i));
-					if (! expr.is("Text") && ! expr.is("Boolean")) {
+					if (! expr.is(SVType.TEXT) && ! expr.is(SVType.BOOLEAN)) {
 						ScriptValueList<Object> arr = new ScriptValueList<>();
 						arr.add((ScriptValue<Object>) expr);
 						throw ScriptException.invalidType("try {...} catch ", "Text or Boolean", arr);
 					}
-					if ( (expr.is("Text") && expr.asString().equals( e.getType() ))
-							| (expr.is("Boolean") && expr.asBoolean())) {
+					if ( (expr.is(SVType.TEXT) && expr.asString().equals( e.getType() ))
+							| (expr.is(SVType.BOOLEAN) && expr.asBoolean())) {
 						if (catchCtx.varToAssign.size() > i && catchCtx.varToAssign.get(i) != null)
 							context.assign(catchCtx.varToAssign.get(i).getText(), expr, false);
 						visit(catchCtx.block());
@@ -340,7 +256,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		if (ctx.arguments() != null)
 			args = visitArgs(ctx.arguments());
 		else
-			args = new Args();
+			args = new Args(context);
 		if (arg != null)
 			args.add(0, (ScriptValue<Object>) arg);
 
@@ -352,7 +268,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	}
 
 	public Args visitArgs(ScriptsParser.ArgumentsContext ctx) {
-		Args args = new Args();
+		Args args = new Args(context);
 		for (ScriptsParser.ExpressionContext exprCtx: ctx.expression()) {
 			args.add((ScriptValue<Object>) visitExpression(exprCtx));
 		}
@@ -361,17 +277,17 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		}
 		for (ScriptsParser.SplatListContext splatCtx: ctx.splatList()) {
 			ScriptValue<?> visited = visitSplatList(splatCtx);
-			if ( ! visited.is("List"))
+			if ( ! visited.is(SVType.LIST))
 				throw ScriptException.invalidType("[splat] \"" + splatCtx.getText() + "\" ", "List", Types.getPrettyArg(visited), visited.type);
 			args.getArgsList().addAll(visited.asList());
 		}
 		for (ScriptsParser.SplatDictContext splatCtx: ctx.splatDict()) {
 			ScriptValue<?> visited = visitSplatDict(splatCtx);
-			if ( ! visited.is("Dictionary"))
+			if ( ! visited.is(SVType.DICTIONARY))
 				throw ScriptException.invalidType("[splat] \"" + splatCtx.getText() + "\" ", "Dictionary", Types.getPrettyArg(visited), visited.type);
 			StringScriptValueMap<Object> argsMap = args.getArgsMap();
 			for (Map.Entry<ScriptValue<Object>, ScriptValue<Object>> entry: visited.asMap().entrySet()) {
-				if (! entry.getKey().is("String"))
+				if (! entry.getKey().is(SVType.TEXT))
 					throw ScriptException.invalidType("[splat] \"" + splatCtx.getText() + "\" ", "a Dictionary with only strings as keys", entry.getKey().toString(), entry.getKey().type);
 				argsMap.put(entry.getKey().asString(), entry.getValue());
 			}
@@ -395,22 +311,22 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		ScriptException error = ScriptException.invalidOperator(where, a, operator.getText(), b);
 		switch (operator.getType()) {
 			case ScriptsParser.PLUS:
-				if (a.is("Integer") && b.is("Integer")) 
+				if (a.is(SVType.INTEGER) && b.is(SVType.INTEGER))
 					return new ScriptValue<>(a.asInteger() + b.asInteger());
 				else if (a.isNumber() && b.isNumber())
 					return new ScriptValue<>(a.asDouble() + b.asDouble());
-				else if ((a.is("Text") && (b.isNumber() || b.is("Text"))) || (b.is("Text") && a.isNumber()))
+				else if ((a.is(SVType.TEXT) && (b.isNumber() || b.is(SVType.TEXT))) || (b.is(SVType.TEXT) && a.isNumber()))
 					return new ScriptValue<>(a.toString() + b.toString());
 				else {
 					if (global)
 						throw new ScriptException(ExceptionType.GLOBAL_NOT_ALLOWED, where, "",
 								"special function of operator '" + operator.getText() + "' between " + a.type + " and " +
 								b.type + " cannot be global, that doesn't mean anything.");
-					if (a.is("List")) {
+					if (a.is(SVType.LIST)) {
 						a.asList().add((ScriptValue<Object>) b);
 						return NONE;
 					}
-					else if (a.is("Dictionary") && b.is("List")) {
+					else if (a.is(SVType.DICTIONARY) && b.is(SVType.LIST)) {
 						if (b.asList().size() != 2)
 							throw error;
 						a.asMap().put(b.asList().get(0), b.asList().get(1));
@@ -420,7 +336,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 						throw error;
 				}
 			case ScriptsParser.MINUS:
-				if (a.is("Integer") && b.is("Integer"))
+				if (a.is(SVType.INTEGER) && b.is(SVType.INTEGER))
 					return new ScriptValue<>(a.asInteger() - b.asInteger());
 				else if (a.isNumber() && b.isNumber())
 					return new ScriptValue<>(a.asDouble() - b.asDouble());
@@ -429,14 +345,14 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 						throw new ScriptException(ExceptionType.GLOBAL_NOT_ALLOWED, where, "",
 								"special function of operator '" + operator.getText() + "' between " + a.type + " and " +
 								b.type + " cannot be global, that doesn't mean anything.");
-					if (a.is("List")) {
-						if (! b.is("Integer"))
+					if (a.is(SVType.LIST)) {
+						if (! b.is(SVType.INTEGER))
 							throw error;
 						//noinspection SuspiciousMethodCalls
 						a.asList().remove(b.asInteger());
 						return NONE;
 					}
-					else if (a.is("Dictionary")) {
+					else if (a.is(SVType.DICTIONARY)) {
 						if (! a.asMap().containsKey(b))
 							throw new ScriptException(ExceptionType.NOT_DEFINED, where, varName + "[" + Types.getPrettyArg(b) + "]", "you tried to remove element " + Types.getPrettyArg(b) + " of Dictionary " + varName +
 									" but it's not there. You can call \"" + varName + ".keyList\" to get a list of keys.");
@@ -448,7 +364,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 				//break;
 			case ScriptsParser.TIMES:
 				if (!(a.isNumber()&&b.isNumber())) throw error;
-				if (a.is("Integer") && b.is("Integer"))
+				if (a.is(SVType.INTEGER) && b.is(SVType.INTEGER))
 					return new ScriptValue<>(a.asInteger() * b.asInteger());
 				else
 					return new ScriptValue<>(a.asDouble() * b.asDouble());
@@ -462,14 +378,14 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 				//break;
 			case ScriptsParser.MODULO:
 				if (!(a.isNumber()&&b.isNumber())) throw error;
-				if (a.is("Integer") && b.is("Integer"))
+				if (a.is(SVType.INTEGER) && b.is(SVType.INTEGER))
 					return new ScriptValue<>(a.asInteger() % b.asInteger());
 				else
 					return new ScriptValue<>(a.asDouble() % b.asDouble());
 				//break;
 			case ScriptsParser.POW:
 				if (!(a.isNumber()&&b.isNumber())) throw error;
-				if (a.is("Integer") && b.is("Integer"))
+				if (a.is(SVType.INTEGER) && b.is(SVType.INTEGER))
 					return new ScriptValue<>((int) Math.round(Math.pow(a.asInteger(), b.asInteger())));
 				else
 					return new ScriptValue<>(Math.pow(a.asDouble(), b.asDouble()));
@@ -502,7 +418,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	
 	protected ScriptValue<?> get_from_list(ScriptValue<?> obj, ScriptsParser.Get_from_listContext getFromListContext, String nameOfVar) {
 		if (getFromListContext.nbSingle != null) {
-			if (obj.is("List")) {
+			if (obj.is(SVType.LIST)) {
 				int number = visitExpression(getFromListContext.nbSingle).asInteger();
 				int size = obj.asList().size();
 				if (number >= size || number <= -size) {
@@ -512,7 +428,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 				if (number < 0) number += size;
 				return obj.asList().get(number);
 			}
-			else if (obj.is("Dictionary")) {
+			else if (obj.is(SVType.DICTIONARY)) {
 				ScriptValue<?> key = visitExpression(getFromListContext.nbSingle);
 				ScriptValue<?> element = obj.asMap().get(key);
 				if (element == null) {
@@ -521,7 +437,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 				}
 				return element;
 			}
-			else if (obj.is("Text")) {
+			else if (obj.is(SVType.TEXT)) {
 				int number = visitExpression(getFromListContext.nbSingle).asInteger();
 				int size = obj.asString().length();
 				if (number >= size || number <= -size) {
@@ -538,7 +454,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 						" isn't a List, a Dictionary or Text, so you can't ask for a specific element in it");
 		}
 		else {
-			if (obj.is("List")) {
+			if (obj.is(SVType.LIST)) {
 				Integer nb1 = getFromListContext.nb1 == null ? null : visitExpression(getFromListContext.nb1).asInteger();
 				Integer nb2 = getFromListContext.nb2 == null ? null : visitExpression(getFromListContext.nb2).asInteger();
 				if (nb1 == null && nb2 == null)
@@ -572,7 +488,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 					return new ScriptValue<>(obj.asList().subList(0, nb2));
 				}
 			}
-			else if (obj.is("Text")) {
+			else if (obj.is(SVType.TEXT)) {
 				Integer nb1 = visitExpression(getFromListContext.nb1).asInteger();
 				Integer nb2 = visitExpression(getFromListContext.nb2).asInteger();
 				if (nb1 == null && nb2 == null)
@@ -783,13 +699,13 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 					break;
 				case ScriptsParser.IN:
 					switch (before.type) {
-						case "List":
+						case LIST:
 							before = new ScriptValue<>(before.asList().contains(visitComp_atom(ctx.comp_atom(i))));
 							break;
-						case "Dictionary":
+						case DICTIONARY:
 							before = new ScriptValue<>(before.asMap().containsKey(visitComp_atom(ctx.comp_atom(i))));
 							break;
-						case "Text":
+						case TEXT:
 							before = new ScriptValue<>(before.asString().contains(visitComp_atom(ctx.comp_atom(i)).asString()));
 							break;
 						default:
@@ -858,9 +774,9 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		ScriptValue<?> value;
 		if (ctx.MINUS() != null) {
 			value = visitMaths_atom(ctx.maths_atom());
-			if (value.is("Integer"))
+			if (value.is(SVType.INTEGER))
 				value = new ScriptValue<>(-value.asInteger());
-			else if (value.is("Decimal"))
+			else if (value.is(SVType.DECIMAL))
 				value = new ScriptValue<>(-value.asDouble());
 			else
 				throw ScriptException.invalidType("[negate] ", "Integer or Decimal for negating it", Types.getPrettyArg(value), value.type);
@@ -885,18 +801,18 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	
 	public static boolean determineBoolean(ScriptValue<?> value) {
 		switch (value.type) {
-			case "Boolean":
+			case BOOLEAN:
 				return value.asBoolean();
-			case "Integer":
+			case INTEGER:
 				return value.asInteger() != 0;
-			case "Decimal":
+			case DECIMAL:
 				return value.asDouble() != 0;
-			case "List":
-				return value.asList().size() != 0;
-			case "Dictionary":
-				return value.asMap().size() != 0;
-			case "Text":
+			case TEXT:
 				return value.asString().length() != 0;
+			case LIST:
+				return value.asList().size() != 0;
+			case DICTIONARY:
+				return value.asMap().size() != 0;
 			default:
 				return false;
 		}
@@ -905,7 +821,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	@Override
 	public ScriptValue<?> visitLog(ScriptsParser.LogContext ctx) {
 		ScriptValue<?> value = visitExpression_part(ctx.expression_part());
-		CustomLogger.info("[script's log] " + ctx.expression_part().getText() + " = " + Types.getPrettyArg(value));
+		CustomLogger.info("[log] " + ctx.expression_part().getText() + " = " + Types.getPrettyArg(value));
 		return value;
 	}
 

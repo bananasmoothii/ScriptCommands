@@ -28,6 +28,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Objects;
 
 /**
@@ -41,42 +42,48 @@ public class Context implements Cloneable {
 	public StringScriptValueMap<Object> normalVariables = new StringScriptValueMap<>();
 	public static StringScriptValueMap<Object> globalVariables = StringScriptValueMap.getTheGlobal();
 
-	protected BaseUsableFunctions usableFunctions = new BaseUsableFunctions(this);
 	protected static HashMap<String, Pair<ScriptFunction, Args.NamingPattern>> scriptFunctions = new HashMap<>();
+	protected static HashMap<String, Pair<ScriptIterator, Args.NamingPattern>> scriptIterators = new HashMap<>();
+
+	static {
+		registerMethodsFromClass(BaseUsableFunctions.class);
+		registerMethodsFromClass(BaseUsableIterators.class);
+	}
 
 	/**
 	 * @param baseVariables variables that will be given to the script, null for no other variable
 	 */
 	public Context(@Nullable StringScriptValueMap<Object> baseVariables) {
-		registerMethodsFromObject(usableFunctions);
 		if (baseVariables != null)
 			normalVariables.putAll(baseVariables);
 	}
 
-	/*
-	 * Just make a new {@link Context} with the same {@link BaseUsableFunctions}
-	 *
-	public Context(UF usableFunctions, Storage storage) {
-		this.usableFunctions = usableFunctions;
-		usableFunctionClass = (Class<UF>) usableFunctions.getClass();
-	}*/
+	public Context() {
+		this(null);
+	}
 
-	public static void registerMethodsFromObject(Object object) {
-		for (Method method: object.getClass().getDeclaredMethods()) {
-			if (! method.isAnnotationPresent(ScriptFunctionMethod.class))
-				continue;
+	public static void registerMethodsFromClass(Class<?> cls) {
+		for (Method method: cls.getDeclaredMethods()) {
+			boolean isIterator;
+			if (method.isAnnotationPresent(ScriptFunctionMethod.class))
+				isIterator = false;
+			else if (method.isAnnotationPresent(ScriptIteratorMethod.class))
+				isIterator = true;
+			else continue;
 
 			if (! Arrays.equals(new Class[] {Args.class}, method.getParameterTypes()))
 				throw new ScriptFunction.InvalidMethodException("method's type isn't Args.");
 
-			if (! method.getReturnType().equals(ScriptValue.class))
+			if (!isIterator && ! method.getReturnType().equals(ScriptValue.class))
+				throw new ScriptFunction.InvalidMethodException("method's return type isn't ScriptValue.");
+			if (isIterator && ! method.getReturnType().equals(Iterator.class))
 				throw new ScriptFunction.InvalidMethodException("method's return type isn't ScriptValue.");
 
 			String variable = method.getName();
 
 			@Nullable Args.NamingPattern namingPattern = null;
 			try {
-				Field namingPatternProvider = object.getClass().getField(variable);
+				Field namingPatternProvider = cls.getField(variable);
 				if (namingPatternProvider.isAnnotationPresent(NamingPatternProvider.class)
 						&& namingPatternProvider.getType().equals(Args.NamingPattern.class)) {
 					namingPattern = (Args.NamingPattern) namingPatternProvider.get(null);
@@ -86,24 +93,45 @@ public class Context implements Cloneable {
 				e.printStackTrace();
 			}
 
-			scriptFunctions.put(variable, new Pair<>((Args args) -> {
-				try {
-					return (ScriptValue<Object>) method.invoke(object, args);
+			if (! isIterator) {
+				registerScriptFunction(variable, (Args args) -> {
+					try {
+						return (ScriptValue<Object>) method.invoke(null, args);
 
-				} catch (IllegalAccessException e) {
-					throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, variable, args,
-							"Access to function \"" + variable + "\" was refused");
-				} catch (InvocationTargetException e) {
-					Throwable targetException = e.getTargetException();
-					if (targetException instanceof ScriptException) {
-						throw (ScriptException) targetException;
-					} else {
-						throw (ScriptException) new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, variable, args,
-								"other error:\n" + targetException.getClass().getName() + ": " + targetException.getMessage())
-								.initCause(targetException);
+					} catch (IllegalAccessException e) {
+						throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, variable, args,
+								"Access to function \"" + variable + "\" was refused");
+					} catch (InvocationTargetException e) {
+						Throwable targetException = e.getTargetException();
+						if (targetException instanceof ScriptException) {
+							throw (ScriptException) targetException;
+						} else {
+							throw (ScriptException) new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, variable, args,
+									"other error:\n" + targetException.getClass().getName() + ": " + targetException.getMessage())
+									.initCause(targetException);
+						}
 					}
-				}
-			}, namingPattern));
+				}, namingPattern);
+			} else {
+				registerScriptIterator(variable, (Args args) -> {
+					try {
+						return (Iterator<ScriptValue<?>>) method.invoke(null, args);
+
+					} catch (IllegalAccessException e) {
+						throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, variable, args,
+								"Access to function \"" + variable + "\" was refused");
+					} catch (InvocationTargetException e) {
+						Throwable targetException = e.getTargetException();
+						if (targetException instanceof ScriptException) {
+							throw (ScriptException) targetException;
+						} else {
+							throw (ScriptException) new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, variable, args,
+									"other error:\n" + targetException.getClass().getName() + ": " + targetException.getMessage())
+									.initCause(targetException);
+						}
+					}
+				}, namingPattern);
+			}
 		}
 	}
 
@@ -111,8 +139,12 @@ public class Context implements Cloneable {
 		scriptFunctions.put(funcName, new Pair<>(scriptFunction, namingPattern));
 	}
 
+	public static void registerScriptIterator(String funcName, ScriptIterator scriptIterator, @Nullable Args.NamingPattern namingPattern) {
+		scriptIterators.put(funcName, new Pair<>(scriptIterator, namingPattern));
+	}
+
 	public ScriptValue<?> callAndRun(String variable)  {
-		return this.callAndRun(variable, new Args());
+		return this.callAndRun(variable, new Args(this));
 	}
 
 	public ScriptValue<?> callAndRun(String variable, Args args) {
@@ -145,17 +177,24 @@ public class Context implements Cloneable {
 			return value;
 		}
 
-		throw new ScriptException(ExceptionType.NOT_DEFINED, variable, args, '\"' + variable + "\" does not exists.");
+		throw new ScriptException(ExceptionType.NOT_DEFINED, variable, args, '\"' + variable + "\" does not exist.");
+	}
+
+	public static @Nullable Iterator<ScriptValue<?>> getIterator(String name, Args args) {
+		if (scriptIterators.containsKey(name)) {
+			Pair<ScriptIterator, Args.NamingPattern> pair = scriptIterators.get(name);
+			return pair.a.run(args.setNamingPattern(pair.b));
+		}
+		return null;
 	}
 	 
 	public void assign(String key, ScriptValue<?> value, boolean global) {
-		if (Arrays.stream(this.usableFunctions.getClass().getDeclaredMethods()).anyMatch(x -> key.equals(x.getName()))
-				|| (global && normalVariables.containsKey(key))) {
+		if (scriptFunctions.containsKey(key) || (global && normalVariables.containsKey(key))) {
 			throw new ScriptException(ExceptionType.NOT_OVERRIDABLE, "<assignment to " + key + '>', "",
 					"you tried to create/modify \"" + key + "\", but it is already a default function, or not a global" +
 							" variable and you tried to make it global, that cannot be overridden.");
 		}
-		if (global || globalVariables.get(key) != null) {
+		if (global || globalVariables.containsKey(key)) {
 			globalVariables.put(key, (ScriptValue<Object>) value);
 		}
 		else {
@@ -170,17 +209,17 @@ public class Context implements Cloneable {
 	}
 
 	public static ScriptValue<?> trigger(ContainingScripts.Type scriptType, String scriptName, @Nullable StringScriptValueMap<Object> baseVariables) {
-		CustomLogger.finer("running " + scriptType.name() + " " + scriptName + " variables: " + baseVariables);
+		CustomLogger.finer("running " + scriptType.name() + " " + scriptName + "(" + Types.getPrettyArgs(null, baseVariables) + ")");
 		ScriptsParser.StartContext parseTree = Objects.requireNonNull(
 				Config.getCorrespondingContainingScripts(scriptType, scriptName), scriptName + " doesn't exist as " + scriptType.name())
 				.parseTree;
 		ScriptsExecutor visitor = new ScriptsExecutor(new Context(baseVariables));
-		visitor.visit((parseTree));
+		visitor.visit(parseTree);
 		return visitor.getReturned();
 	}
 
 	public static ScriptThread threadTrigger(ContainingScripts.Type scriptType, String scriptName, @Nullable StringScriptValueMap<Object> baseVariables) {
-		CustomLogger.finer("running " + scriptType.name() + " " + scriptName + " variables: " + baseVariables);
+		CustomLogger.finer("running " + scriptType.name() + " " + scriptName + "(" + Types.getPrettyArgs(null, baseVariables) + ") ASYNCHRONOUSLY");
 		ScriptsParser.StartContext parseTree = Objects.requireNonNull(
 				Config.getCorrespondingContainingScripts(scriptType, scriptName), scriptName + " doesn't exist as " + scriptType.name())
 				.parseTree;
@@ -196,9 +235,5 @@ public class Context implements Cloneable {
 		} catch (CloneNotSupportedException e) {
 			throw ScriptException.toScriptException(e);
 		}
-	}
-
-	public BaseUsableFunctions getUsableFunctions() {
-		return usableFunctions;
 	}
 }

@@ -153,7 +153,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             ResultSet rs = Storage.executeSQLQuery(query);
             while (rs.next()) {
                 byte type = rs.getByte(2);
-                if (type != value1.typeByte) continue;
+                if (type != value1.type.asByte) continue;
                 ScriptValue<?> objectTested = ScriptValueCollection.transformToScriptValue(rs.getString(1), type);
                 if (objectTested.equals(value1)) return true;
             }
@@ -173,7 +173,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             ResultSet rs = Storage.executeSQLQuery(query);
             while (rs.next()) {
                 byte type = rs.getByte(2);
-                if (type != key1.typeByte) continue;
+                if (type != key1.type.asByte) continue;
                 ScriptValue<?> objectTested = ScriptValueCollection.transformToScriptValue(rs.getString(1), type);
                 if (objectTested.equals(key1)) return true;
             }
@@ -613,6 +613,6 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
      * @return {@code object.type.equals("None") ? "IS" : "="}
      */
     public static String getSQLEqualsSign(ScriptValue<?> object) {
-        return object.is("None") || (object.is("Boolean") && ! object.asBoolean()) ? "IS" : "=";
+        return object.is(ScriptValue.SVType.NONE) || (object.is(ScriptValue.SVType.BOOLEAN) && ! object.asBoolean()) ? "IS" : "=";
     }
 }

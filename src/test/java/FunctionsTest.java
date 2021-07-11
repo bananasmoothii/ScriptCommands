@@ -35,6 +35,8 @@ public class FunctionsTest {
     @Test
     @Order(1)
     void testArgs() {
+        Context context = new Context(null);
+
         Args.NamingPattern np = new Args.NamingPattern()
                 .setNamingPattern(1, "stop")
                 .setNamingPattern("start", "stop", "step")
@@ -51,7 +53,7 @@ public class FunctionsTest {
         map.put("somethingOther", new ScriptValue<>("something other value"));
         map.put("step", new ScriptValue<>(0.5));
 
-        Args args = new Args(list, map);
+        Args args = new Args(list, map, context);
         args.setNamingPattern(np);
 
         CustomLogger.info("start = " + args.getArg("start"));
@@ -62,19 +64,5 @@ public class FunctionsTest {
         assert args.getArg("step").asDouble() == 0.5;
         CustomLogger.info(args.getRemainingArgsList());
         CustomLogger.info(args.getRemainingArgsDictionary());
-    }
-
-    @Test
-    @Order(2)
-    void testSplit() {
-        Context context = new Context(null);
-        ScriptValueList<Object> list = new ScriptValueList<>();
-        list.add(new ScriptValue<>("Hello World"));
-        list.add(new ScriptValue<>(" "));
-        Args args = new Args(list, null);
-
-        ScriptValue<?> result = context.callAndRun("split", args);
-        CustomLogger.fine(result);
-        assert result.toString().equals("[\"Hello\", \"World\"]");
     }
 }

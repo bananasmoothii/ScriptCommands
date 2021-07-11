@@ -39,33 +39,7 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 	@NotNull
 	public final T v;
 
-	/**
-	 * Can be:
-	 * <ul>
-	 *     <li>None</li>
-	 *     <li>Integer</li>
-	 *     <li>Decimal</li>
-	 *     <li>Text</li>
-	 *     <li>Boolean</li>
-	 *     <li>List</li>
-	 *     <li>Dictionary</li>
-	 * </ul>
-	 */
-	public final String type;
-
-	/**
-	 * Will be:
-	 * <ul>
-	 *     <li>0 for None</li>
-	 *     <li>1 for Integer</li>
-	 *     <li>2 for Decimal</li>
-	 *     <li>3 for Text</li>
-	 *     <li>4 for Boolean</li>
-	 *     <li>5 for List</li>
-	 *     <li>6 for Dictionary</li>
-	 * </ul>
-	 */
-	public final byte typeByte;
+	public final SVType type;
 
 	private static final NoneType NONE = NoneType.INSTANCE;
 	
@@ -86,35 +60,61 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 	 *     </ul>
 	 */
 	public ScriptValue(@Nullable T obj) {
-		
-		if (obj == null || obj instanceof NoneType) {
-			v = (T) NONE;
-			type = "None";
-			typeByte = 0;
-		}
-		else {
-			v = obj;
-			if (obj instanceof Integer) {
-				type = "Integer";
-				typeByte = 1;
-			} else if (obj instanceof Double) {
-				type = "Decimal";
-				typeByte = 2;
-			} else if (obj instanceof String) {
-				type = "Text";
-				typeByte = 3;
-			} else if (obj instanceof Boolean) {
-				type = "Boolean";
-				typeByte = 4;
-			} else if (obj instanceof ScriptValueList) {
-				type = "List";
-				typeByte = 5;
-			} else if (obj instanceof ScriptValueMap) {
-				type = "Dictionary";
-				typeByte = 6;
-			} else throw new IllegalArgumentException(obj.getClass().getName()+
-						" is not a valid argument, must be String, Integer, Double, " +
-						"Boolean, ScriptValueList or ScriptValueMap .");
+
+		v = obj == null ? (T) NONE : obj;
+		if (obj == null || obj instanceof NoneType) type = SVType.NONE;
+		else if (obj instanceof Integer)            type = SVType.INTEGER;
+		else if (obj instanceof Double)             type = SVType.DECIMAL;
+		else if (obj instanceof String)             type = SVType.TEXT;
+		else if (obj instanceof Boolean)            type = SVType.BOOLEAN;
+		else if (obj instanceof ScriptValueList)    type = SVType.LIST;
+		else if (obj instanceof ScriptValueMap)     type = SVType.DICTIONARY;
+		else throw new IllegalArgumentException(obj.getClass().getName()+
+					" is not a valid argument, must be String, Integer, Double, " +
+					"Boolean, ScriptValueList or ScriptValueMap .");
+	}
+
+	public enum SVType {
+		NONE("None", (byte) 0),
+		INTEGER("Integer", (byte) 1),
+		DECIMAL("Decimal", (byte) 2),
+		TEXT("Text", (byte) 3),
+		BOOLEAN("Boolean", (byte) 4),
+		LIST("List", (byte) 5),
+		DICTIONARY("Dictionary", (byte) 6);
+
+
+		/**
+		 * Can be:
+		 * <ul>
+		 *     <li>None</li>
+		 *     <li>Integer</li>
+		 *     <li>Decimal</li>
+		 *     <li>Text</li>
+		 *     <li>Boolean</li>
+		 *     <li>List</li>
+		 *     <li>Dictionary</li>
+		 * </ul>
+		 */
+		public String name;
+
+		/**
+		 * Will be:
+		 * <ul>
+		 *     <li>0 for None</li>
+		 *     <li>1 for Integer</li>
+		 *     <li>2 for Decimal</li>
+		 *     <li>3 for Text</li>
+		 *     <li>4 for Boolean</li>
+		 *     <li>5 for List</li>
+		 *     <li>6 for Dictionary</li>
+		 * </ul>
+		 */
+		public byte asByte;
+
+		SVType(String name, byte asByte) {
+			this.name = name;
+			this.asByte = asByte;
 		}
 	}
 
@@ -139,12 +139,12 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 	 */
 	public @Nullable Object toNormalClass(boolean forJson) {
 		if (v instanceof ScriptValueCollection) return ((ScriptValueCollection) v).toNormalClasses(forJson);
-		else if (is("None")) return null;
+		else if (is(SVType.NONE)) return null;
 		else return v;
 	}
 
-	private static Pattern integerPattern = Pattern.compile("\\d+");
-	private static Pattern decimalPattern = Pattern.compile("\\d+\\.\\d+");
+	private static final Pattern integerPattern = Pattern.compile("\\d+");
+	private static final Pattern decimalPattern = Pattern.compile("\\d+\\.\\d+");
 
 	/**
 	 * This method is used for converting simple {@link ScriptValue}s that you got as {@link String} to a real ScriptValue,
@@ -173,12 +173,12 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 		return v.hashCode();
 	}
 
-	public boolean is(String type) {
-		return this.type.equals(type);
+	public boolean is(SVType type) {
+		return this.type == type;
 	}
 	
 	public boolean isNumber() {
-		return is("Integer") || is("Decimal");
+		return is(SVType.INTEGER) || is(SVType.DECIMAL);
 	}
 
 	@NotNull
@@ -188,10 +188,10 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 	}
 	
 	public Iterator<ScriptValue<?>> iterator(String where) {
-		if (is("List")) {
+		if (is(SVType.LIST)) {
 			return ((ScriptValueList) v).iterator(); // idk what to do about this raw type
 		}
-		if (is("Text")) {
+		if (is(SVType.TEXT)) {
 			return new Iterator<ScriptValue<?>>() {
 				private int currentIndex = 0;
 				private final String string = (String) v;
@@ -208,7 +208,7 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 				}
 			};
 		}
-		if (is("Dictionary")) {
+		if (is(SVType.DICTIONARY)) {
 			return new Iterator<ScriptValue<?>>() {
 				private final Iterator<Entry<ScriptValue<Object>, ScriptValue<Object>>> iterator = ((ScriptValueMap<Object, Object>) v).entrySet().iterator();
 
@@ -243,8 +243,8 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 	@Override
 	public ScriptValue<T> clone() {
 		switch (type) {
-			case "List":
-			case "Dictionary":
+			case LIST:
+			case DICTIONARY:
 				return new ScriptValue<>((T) ((ScriptValueCollection) v).clone());
 			default:
 				return this;
@@ -258,7 +258,7 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 
 	@Override
 	public String toString() {
-		if (is("Text"))
+		if (is(SVType.TEXT))
 			return (String) v;
 		return Types.getPrettyArg(this);
 	}

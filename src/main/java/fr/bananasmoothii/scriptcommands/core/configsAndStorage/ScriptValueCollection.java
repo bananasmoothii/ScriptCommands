@@ -110,7 +110,7 @@ public interface ScriptValueCollection extends Cloneable {
      */
     static void setScriptValueInPreparedStatement(PreparedStatement ps, ScriptValue<?> element, int objectIndex, int typeIndex) throws SQLException {
         if (! Storage.isSQL) throw new NullPointerException("the storage class isn't using SQL");
-        if (element == null || element.is("None")) {
+        if (element == null || element.is(ScriptValue.SVType.NONE)) {
             ps.setString(objectIndex, null);
         } else if (element.v instanceof ScriptValueCollection) {
             ScriptValueCollection collection = (ScriptValueCollection) element.v;
@@ -118,12 +118,12 @@ public interface ScriptValueCollection extends Cloneable {
                 collection.makeSQL();
             }
             ps.setString(objectIndex, collection.getStringID().toString());
-        } else if (element.is("Boolean")) {
+        } else if (element.is(ScriptValue.SVType.BOOLEAN)) {
             ps.setString(objectIndex, element.asBoolean() ? "" : null);
         } else {
             ps.setString(objectIndex, element.toString());
         }
-        ps.setByte(typeIndex, element != null ? element.typeByte : 0);
+        ps.setByte(typeIndex, element != null ? element.type.asByte : 0);
     }
 
     /**

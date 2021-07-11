@@ -21,7 +21,7 @@ public class CollectionsTest {
 
     static final String yamlString = "\n" +
             "  # can be \"json\", \"SQLite\" or \"MySQL\"\n" +
-            "  method: json" + // TODO: test with json when StringScriptValueMap will be set up, and mySQL
+            "  method: json" +
             "\n" +
             "  json:\n" +
             "    file-location: plugins/ScriptCommands/storage.json\n" +

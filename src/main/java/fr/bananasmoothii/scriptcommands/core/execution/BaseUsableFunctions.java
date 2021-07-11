@@ -23,93 +23,27 @@ import fr.bananasmoothii.scriptcommands.core.execution.Args.NamingPattern;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Objects;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
-@SuppressWarnings({"unchecked", "unused", "MethodMayBeStatic"})
+@SuppressWarnings({"unchecked", "unused"})
 public class BaseUsableFunctions {
 
-	private final Context context;
-
 	private static final ScriptValue<NoneType> NONE = new ScriptValue<>(null);
-
-	public BaseUsableFunctions(@NotNull Context context) {
-		this.context = Objects.requireNonNull(context);
-	}
-
-	@ScriptFunctionMethod
-	public ScriptValue<String> getDisplayName(Args args) {
-		String name = args.getSingleArg().asString();
-		// will be spigot's real method of course
-		if (name.equals("Bananasmoothii"))
-			name = "[Fonda] Bananasmoothii";
-		else if (name.equals("Dryter97")) {
-			name = "[Admin] Dryter97";
-		}
-		return new ScriptValue<>(name);
-	}
 
 	/**
 	 * Can take any parameter as it calls {@link ScriptValue#toString()} on it
 	 */
 	@ScriptFunctionMethod
-	public ScriptValue<String> toText(Args args) {
+	public static ScriptValue<String> toText(Args args) {
 		String s = args.getSingleArg().toString();
 		return new ScriptValue<>(s);
 	}
 
-	@NamingPatternProvider
-	public static final NamingPattern player_cmd = new NamingPattern()
-			.setNamingPattern("cmd", "player");
-
-
 	@ScriptFunctionMethod
-	public ScriptValue<NoneType> player_cmd(Args args) {
-		args.setNamingPattern(new NamingPattern()
-				.setNamingPattern(1, "cmd")
-				.setNamingPattern("player", "cmd"));
-		ScriptValue<Object> players = args.getArgIfExist("player");
-		String cmd = args.getArg("cmd").asString();
-		
-		ArrayList<String> playersInArg = new ArrayList<>();
-		if (players == null) {
-			if (! context.normalVariables.containsKey("player") || ! context.normalVariables.get("player").is("String"))
-				throw new ScriptException(ScriptException.ExceptionType.INVALID_ARGUMENTS, args, "no player was specified and couldn't get it from the normal variables.");
-			playersInArg.add(context.normalVariables.get("player").asString());
-		}
-		else {
-			for (ScriptValue<?> player: players.asList()) {
-				playersInArg.add(player.asString());
-			}
-		}
-		CustomLogger.finer("player " + String.join(", ", playersInArg) + " ran: " + cmd );
-		return NONE;
-	}
-
-	@NamingPatternProvider
-	public static final NamingPattern player_msg = new NamingPattern()
-			.setNamingPattern("msg", "player");
-	
-	@ScriptFunctionMethod
-	public ScriptValue<NoneType> player_msg(Args args) {
-		ScriptValue<Object> players = args.getArgIfExist("player");
-		String msg = args.getArg("msg").asString();
-		
-		ArrayList<String> playersInArg = new ArrayList<>();
-		if (players == null) {
-			playersInArg.add(context.normalVariables.get("player").asString());
-		}
-		else {
-			for (ScriptValue<?> player: players.asList()) {
-				playersInArg.add(player.asString());
-			}
-		}
-		CustomLogger.finer("player " + String.join(", ", playersInArg) + " was sent a message: " + msg);
-		return NONE;
-	}
-
-	@ScriptFunctionMethod
-	public ScriptValue<NoneType> console_msg(Args args) {
+	public static ScriptValue<NoneType> console_msg(Args args) {
 		CustomLogger.info(args.getSingleArg().toString());
 		return NONE;
 	}
@@ -119,7 +53,7 @@ public class BaseUsableFunctions {
 			.setNamingPattern("list", "separator");
 
 	@ScriptFunctionMethod
-	public ScriptValue<String> join(Args args) {
+	public static ScriptValue<String> join(Args args) {
 		ScriptValueList<?> list = args.getArg("list").asList();
 		String separator = args.getArg("separator").asString();
 
@@ -135,7 +69,7 @@ public class BaseUsableFunctions {
 			.setNamingPattern("string", "separator");
 	
 	@ScriptFunctionMethod
-	public ScriptValue<ScriptValueList<String>> split(Args args) {
+	public static ScriptValue<ScriptValueList<String>> split(Args args) {
 		String string = args.getArg("string").asString();
 		int length = string.length();
 		ScriptValue<Object> scriptValueSeparator = args.getArgIfExist("separator");
@@ -182,16 +116,14 @@ public class BaseUsableFunctions {
 	}
 
 	@ScriptFunctionMethod
-	public ScriptValue<?> papi(Args args) {
+	public static ScriptValue<?> papi(Args args) {
 		return args.getSingleArg();
 	}
 
 	@ScriptFunctionMethod
-	public ScriptValue<?> randChoice(Args args) {
-
-		Random random = new Random();
+	public static ScriptValue<?> randChoice(Args args) {
 		ScriptValueList<Object> list = args.getSingleArg().asList();
-		return list.get(random.nextInt(list.size()));
+		return list.get(ThreadLocalRandom.current().nextInt(list.size()));
 	}
 
 	public static final NamingPattern range = new NamingPattern()
@@ -201,12 +133,12 @@ public class BaseUsableFunctions {
 			.setDefaultValue("step", 1);
 
 	@ScriptFunctionMethod
-	public ScriptValue<ScriptValueList<Object>> range(Args args) {
+	public static ScriptValue<ScriptValueList<Object>> range(Args args) {
 		ScriptValue<?> start = args.getArg("start"),
 				stop  = args.getArg("stop"),
 				step  = args.getArg("step");
 
-		boolean allInt = start.is("Integer") && stop.is("Integer") && step.is("Integer");
+		boolean allInt = start.is(ScriptValue.SVType.INTEGER) && stop.is(ScriptValue.SVType.INTEGER) && step.is(ScriptValue.SVType.INTEGER);
 		if (allInt) {
 			int start1 = start.asInteger(),
 					stop1 = stop.asInteger(),
@@ -232,10 +164,10 @@ public class BaseUsableFunctions {
 	}
 
 	@ScriptFunctionMethod
-	public ScriptValue<Integer> toInteger(Args args) {
+	public static ScriptValue<Integer> toInteger(Args args) {
 		ScriptValue<?> arg = args.getSingleArg();
 		switch (arg.type) {
-			case "Text":
+			case TEXT:
 				try {
 					return new ScriptValue<>(Integer.valueOf(arg.toString().replace("_", "")));
 				} catch (NumberFormatException ignored) {
@@ -243,11 +175,11 @@ public class BaseUsableFunctions {
 							StackTraceUtils.getFromStackTrace(-1), args, "Cannot convert the Text \"" +
 							arg.asString() + "\" to Integer.");
 				}
-			case "Integer":
+			case INTEGER:
 				return (ScriptValue<Integer>) arg;
-			case "Decimal":
+			case DECIMAL:
 				return new ScriptValue<>(arg.asInteger());
-			case "Boolean":
+			case BOOLEAN:
 				if (arg.asBoolean())
 					return new ScriptValue<>(1);
 				else
@@ -263,7 +195,7 @@ public class BaseUsableFunctions {
 			.setNamingPattern("list");
 
 	@ScriptFunctionMethod
-	public ScriptValue<NoneType> add(Args args) {
+	public static ScriptValue<NoneType> add(Args args) {
 		ScriptValueList<Object> list = args.getArg("list").asList();
 		ScriptValueList<Object> remainingArgs = args.getRemainingArgsList();
 		list.addAll(remainingArgs.clone());

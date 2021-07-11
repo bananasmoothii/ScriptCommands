@@ -14,35 +14,12 @@
  *    limitations under the License.
  */
 
-grammar Permission;
+package fr.bananasmoothii.scriptcommands.core.execution;
 
-@header {
-package fr.bananasmoothii.scriptcommands.core.antlr4parsing;
+import java.lang.annotation.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Target({ElementType.METHOD})
+public @interface ScriptIteratorMethod {
 }
-
-start
-    : block EOF
-    ;
-
-block
-    : atom (operator += (AND | OR) atom)*
-    ;
-
-atom
-    : PERMISSION_WORD (DOT PERMISSION_WORD)*  # realPermission
-    | OPEN_PAR block CLOSE_PAR                # parenthesis
-    ;
-
-AND: 'and';
-
-OR: 'or';
-
-OPEN_PAR: '(';
-
-CLOSE_PAR: ')';
-
-DOT: '.';
-
-PERMISSION_WORD: ~[ \n\r ().]+;
-
-SPACE: [ \n\r ]+ -> skip;

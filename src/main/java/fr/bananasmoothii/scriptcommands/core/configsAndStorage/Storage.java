@@ -19,10 +19,8 @@ package fr.bananasmoothii.scriptcommands.core.configsAndStorage;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
-import fr.bananasmoothii.scriptcommands.core.execution.BaseUsableFunctions;
 
 import fr.bananasmoothii.scriptcommands.core.execution.Context;
-import fr.bananasmoothii.scriptcommands.core.execution.ScriptCache;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -40,7 +38,7 @@ public abstract class Storage {
     private static @NotNull String sqlTablePrefix = "SC_";
     public static boolean isSQL = false;
     private static HashMap<String, ?> hashMap;
-    private static  @Nullable File file = new File("storage.json");
+    private static  @Nullable File file = new File("plugins/ScriptCommands/storage.json");
     public static final Gson gson;
     static {
         JsonDeserializerFix adapter = new JsonDeserializerFix();
@@ -58,14 +56,14 @@ public abstract class Storage {
 
         missingThing = "storage.method";
         assert hashMap.containsKey("method");
-        String sMethod = hashMap.get("method").toString();
-        assert ! sMethod.equals("method") && hashMap.containsKey(sMethod);
+        String storageMethod = hashMap.get("method").toString();
+        assert ! storageMethod.equals("method") && hashMap.containsKey(storageMethod);
 
-        sqlTablePrefix = (String) ((HashMap<String, Object>) hashMap.get(sMethod)).get("table-prefix");
-        isSQL = sMethod.contains("SQL");
+        sqlTablePrefix = (String) ((HashMap<String, Object>) hashMap.get(storageMethod)).get("table-prefix");
+        isSQL = storageMethod.contains("SQL");
 
         HashMap<String, Object> methodHashMap;
-        switch (sMethod) {
+        switch (storageMethod) {
             case "json":
                 method = StorageMethod.JSON;
 
@@ -137,7 +135,7 @@ public abstract class Storage {
 
                 break;
             default:
-                throw new IllegalArgumentException("Not a valid storage method: " + sMethod);
+                throw new IllegalArgumentException("Not a valid storage method: " + storageMethod);
         }
 
         Context.globalVariables = StringScriptValueMap.getTheGlobal(true);

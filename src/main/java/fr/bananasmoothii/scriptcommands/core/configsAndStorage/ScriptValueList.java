@@ -332,7 +332,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             ResultSet rs = Storage.executeSQLQuery(query);
             while (rs.next()) {
                 byte type = rs.getByte(2);
-                if (type != o1.typeByte) continue;
+                if (type != o1.type.asByte) continue;
                 ScriptValue<?> objectTested = ScriptValueCollection.transformToScriptValue(rs.getString(1), type);
                 if (objectTested.equals(o1)) return true;
             }

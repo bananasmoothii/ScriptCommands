@@ -211,11 +211,15 @@ public class ScriptException extends RuntimeException {
 		return new ScriptException(ExceptionType.INVALID_TYPE, function, got,
 				String.format("excepted %s but got %s", excepted, gotTypes));
 	}
+
+	public static ScriptException invalidType(String function, String expected, String got, ScriptValue.SVType gotType) {
+		return invalidType(function, expected, got, gotType.name);
+	}
 	
 	public static ScriptException invalidOperator(String where, ScriptValue<?> left, String operator, ScriptValue<?> right) {
 		return new ScriptException(ExceptionType.INVALID_OPERATOR, where, "", "invalid operator '" + operator + "' between " + left.type + " and " + right.type +
-		(left.is("Dictionary") && operator.equals("+") && right.is("List") ? " because you can only add a list of two elements to a dictionary." :
-		(left.is("List") && operator.equals("-") && ! right.is("Integer") ? " because the left value must be an Integer." : ".")));
+		(left.is(ScriptValue.SVType.DICTIONARY) && operator.equals("+") && right.is(ScriptValue.SVType.LIST) ? " because you can only add a list of two elements to a dictionary." :
+		(left.is(ScriptValue.SVType.LIST) && operator.equals("-") && ! right.is(ScriptValue.SVType.INTEGER) ? " because the left value must be an Integer." : ".")));
 	}
 
 	/*

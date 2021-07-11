@@ -111,15 +111,17 @@ public class Args {
     private final ScriptValueList<Object> argsList;
     private final StringScriptValueMap<Object> argsMap;
     private @Nullable NamingPattern namingPattern;
+    public @NotNull Context context;
 
 
-    public Args() {
-        this(null, null);
+    public Args(@NotNull Context context) {
+        this(null, null, context);
     }
 
-    public Args(@Nullable ScriptValueList<Object> argsList, @Nullable StringScriptValueMap<Object> argsMap) {
+    public Args(@Nullable ScriptValueList<Object> argsList, @Nullable StringScriptValueMap<Object> argsMap, @NotNull Context context) {
         this.argsList = argsList == null ? new ScriptValueList<>() : argsList;
         this.argsMap = argsMap == null ? new StringScriptValueMap<>() : argsMap;
+        this.context = context;
     }
 
     public Args setNamingPattern(@Nullable NamingPattern namingPattern) {

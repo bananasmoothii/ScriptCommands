@@ -14,17 +14,31 @@
  *    limitations under the License.
  */
 
-package fr.bananasmoothii.scriptcommands.core.execution;
+grammar Permission;
 
-import java.lang.annotation.*;
+start
+    : block EOF
+    ;
 
-/**
- * This annotation is for <strong>public static final</strong> fields of type {@link fr.bananasmoothii.scriptcommands.core.execution.Args.NamingPattern}.
- * It will be used by {@link Context#registerMethodsFromClass(Object)} for making a
- * {@link fr.bananasmoothii.scriptcommands.core.execution.Args.NamingPattern} only once.
- */
-@Retention(RetentionPolicy.RUNTIME)
-@Documented
-@Target(ElementType.FIELD)
-public @interface NamingPatternProvider {
-}
+block
+    : atom (operator += (AND | OR) atom)*
+    ;
+
+atom
+    : PERMISSION_WORD (DOT PERMISSION_WORD)*  # realPermission
+    | OPEN_PAR block CLOSE_PAR                # parenthesis
+    ;
+
+AND: 'and';
+
+OR: 'or';
+
+OPEN_PAR: '(';
+
+CLOSE_PAR: ')';
+
+DOT: '.';
+
+PERMISSION_WORD: ~[ \n\r ().]+;
+
+SPACE: [ \n\r ]+ -> skip;

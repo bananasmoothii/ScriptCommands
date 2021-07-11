@@ -16,10 +16,6 @@
 
 lexer grammar ScriptsLexer;
 
-@header {
-package fr.bananasmoothii.scriptcommands.core.antlr4parsing;
-}
-
 @lexer::members {
 	private int expressionDepth = 0;
 	private int n; // used for counting characters in variables

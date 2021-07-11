@@ -17,31 +17,34 @@
 package fr.bananasmoothii.scriptcommands.bukkit;
 
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
-import fr.bananasmoothii.scriptcommands.core.antlr4parsing.ScriptsParser;
-import fr.bananasmoothii.scriptcommands.core.configsAndStorage.*;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.Config;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ContainingScripts;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.Storage;
 import fr.bananasmoothii.scriptcommands.core.execution.Context;
-import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
-import fr.bananasmoothii.scriptcommands.core.execution.ScriptsExecutor;
-import org.bukkit.Server;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ScriptCommands extends JavaPlugin {
 
+    private static ScriptCommands inst;
+
     @Override
     public void onEnable() {
+        inst = this;
         CustomLogger.setLogger(getLogger());
         Config.load(this::saveDefaultConfig);
+        Context.registerMethodsFromClass(BukkitUsableFunctions.class);
 
-        StringScriptValueMap<Object> baseVars = new StringScriptValueMap<>();
-        baseVars.put("server", new ScriptValue<>(this.getServer().getName() + getServer().toString()));
-
-        Context.threadTrigger(ContainingScripts.Type.EVENT, "server_start", baseVars);
+        Context.threadTrigger(ContainingScripts.Type.EVENT, "server_start", null);
 
     }
 
     @Override
     public void onDisable() {
         Storage.saveAndClose();
+    }
+
+    public static ScriptCommands inst() {
+        return inst;
     }
 }
 
