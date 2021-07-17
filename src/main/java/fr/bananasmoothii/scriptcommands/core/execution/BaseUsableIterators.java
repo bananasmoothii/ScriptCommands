@@ -22,7 +22,7 @@ import java.util.Iterator;
 public class BaseUsableIterators {
 
     @NamingPatternProvider
-    private static final Args.NamingPattern range = new Args.NamingPattern()
+    public static final Args.NamingPattern range = new Args.NamingPattern()
             .setNamingPattern(1, "stop")
             .setNamingPattern("start", "stop", "step")
             .setDefaultValue("start", 0)
@@ -34,7 +34,7 @@ public class BaseUsableIterators {
         ScriptValue<?> start = args.getArg("start"),
                 stop  = args.getArg("stop"),
                 step  = args.getArg("step");
-        boolean allInt = start.is(ScriptValue.SVType.INTEGER) && stop.is(ScriptValue.SVType.INTEGER) && step.is(ScriptValue.SVType.INTEGER);
+        boolean allInt = start.is(ScriptValue.ScriptValueType.INTEGER) && stop.is(ScriptValue.ScriptValueType.INTEGER) && step.is(ScriptValue.ScriptValueType.INTEGER);
         if (allInt)
             return (Iterator<ScriptValue<?>>) (Iterator) new BaseUsableIterators.ScriptValueDoubleIterator(start.asInteger(), stop.asInteger(), step.asInteger()); // messy but best way //TODO: test
         return (Iterator<ScriptValue<?>>) (Iterator) new BaseUsableIterators.ScriptValueDoubleIterator(start.asDouble(), stop.asDouble(), step.asDouble());

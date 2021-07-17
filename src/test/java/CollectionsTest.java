@@ -1,6 +1,5 @@
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.*;
-import fr.bananasmoothii.scriptcommands.core.execution.BaseUsableFunctions;
 import fr.bananasmoothii.scriptcommands.core.execution.Context;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
 import org.junit.jupiter.api.*;
@@ -79,11 +78,7 @@ public class CollectionsTest {
         CustomLogger.info(list.size());
 
         list.add(new ScriptValue<>(null));
-        try {
-            list.add(new ScriptValue<>(list));
-        } catch (ElementIsCollectionException e) {
-            CustomLogger.info(e.getMessage() + " ==> it is working");
-        }
+
         //noinspection SpellCheckingInspection
         list.add(new ScriptValue<>("heyo"));
         list.add(new ScriptValue<>(123456789));
@@ -127,6 +122,7 @@ public class CollectionsTest {
         Context.globalVariables.put("someSubList", new ScriptValue<>(subList));
     }
 
+    @SuppressWarnings("SuspiciousMethodCalls")
     void contains() {
         ScriptValueList<Object> list = new ScriptValueList<>(true);
         list.add(new ScriptValue<>(true));
@@ -272,7 +268,7 @@ public class CollectionsTest {
 
     void jsonSerialisationTest() {
         ScriptValueMap<Object, Object> map1 = new ScriptValueMap<>();
-        map1.put(new ScriptValue<>(100.0), new ScriptValue<>(null));
+        map1.put(new ScriptValue<>(100.0), (ScriptValue<Object>) (ScriptValue) ScriptValue.NONE);
 
         ScriptValueList<Object> list1 = new ScriptValueList<>();
         list1.add(new ScriptValue<>(map1));

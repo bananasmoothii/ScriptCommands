@@ -17,21 +17,17 @@
 package fr.bananasmoothii.scriptcommands.core.execution;
 
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
-import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
 import fr.bananasmoothii.scriptcommands.core.execution.Args.NamingPattern;
-import org.jetbrains.annotations.NotNull;
+import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType;
 
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
+
+import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.NONE;
 
 @SuppressWarnings({"unchecked", "unused"})
 public class BaseUsableFunctions {
-
-	private static final ScriptValue<NoneType> NONE = new ScriptValue<>(null);
 
 	/**
 	 * Can take any parameter as it calls {@link ScriptValue#toString()} on it
@@ -117,7 +113,7 @@ public class BaseUsableFunctions {
 
 	@ScriptFunctionMethod
 	public static ScriptValue<?> papi(Args args) {
-		return args.getSingleArg();
+		return new ScriptValue<>("papi: " + args.getSingleArg());
 	}
 
 	@ScriptFunctionMethod
@@ -126,6 +122,7 @@ public class BaseUsableFunctions {
 		return list.get(ThreadLocalRandom.current().nextInt(list.size()));
 	}
 
+	@NamingPatternProvider
 	public static final NamingPattern range = new NamingPattern()
 			.setNamingPattern(1, "stop")
 			.setNamingPattern("start", "stop", "step")
@@ -138,7 +135,9 @@ public class BaseUsableFunctions {
 				stop  = args.getArg("stop"),
 				step  = args.getArg("step");
 
-		boolean allInt = start.is(ScriptValue.SVType.INTEGER) && stop.is(ScriptValue.SVType.INTEGER) && step.is(ScriptValue.SVType.INTEGER);
+		boolean allInt = start.is(ScriptValue.ScriptValueType.INTEGER)
+				&& stop.is(ScriptValue.ScriptValueType.INTEGER)
+				&& step.is(ScriptValue.ScriptValueType.INTEGER);
 		if (allInt) {
 			int start1 = start.asInteger(),
 					stop1 = stop.asInteger(),
@@ -170,23 +169,22 @@ public class BaseUsableFunctions {
 			case TEXT:
 				try {
 					return new ScriptValue<>(Integer.valueOf(arg.toString().replace("_", "")));
-				} catch (NumberFormatException ignored) {
-					throw new ScriptException(ScriptException.ExceptionType.CONVERSION_ERROR,
-							StackTraceUtils.getFromStackTrace(-1), args, "Cannot convert the Text \"" +
-							arg.asString() + "\" to Integer.");
+				} catch (NumberFormatException e) {
+					throw new ScriptException(ExceptionType.CONVERSION_ERROR, args.context,
+							"Cannot convert the Text \"" + arg.asString() + "\" to Integer.");
 				}
 			case INTEGER:
 				return (ScriptValue<Integer>) arg;
 			case DECIMAL:
-				return new ScriptValue<>(arg.asInteger());
+				return new ScriptValue<>((int) arg.asDouble());
 			case BOOLEAN:
 				if (arg.asBoolean())
 					return new ScriptValue<>(1);
 				else
 					return new ScriptValue<>(0);
 			default:
-				throw new ScriptException(ScriptException.ExceptionType.CONVERSION_ERROR,
-						StackTraceUtils.getFromStackTrace(-1), args, "Cannot convert " + arg.type + " to Integer.");
+				throw new ScriptException(ExceptionType.CONVERSION_ERROR, args.context,
+						"Cannot convert " + Types.getPrettyArgAndType(arg) + " to Integer.");
 		}
 	}
 

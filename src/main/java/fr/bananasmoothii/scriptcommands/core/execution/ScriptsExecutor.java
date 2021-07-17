@@ -22,6 +22,7 @@ import fr.bananasmoothii.scriptcommands.core.antlr4parsing.ScriptsParserBaseVisi
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueMap;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
+import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ContextStackTraceElement;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -30,15 +31,15 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.naming.InvalidNameException;
+import java.util.Iterator;
+import java.util.Map;
 
-import java.util.*;
+import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.NONE;
+import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.ScriptValueType;
 
-import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.*;
-
-@SuppressWarnings("unchecked")
+@SuppressWarnings("unchecked") // because we are often switching from wildcard to object
 public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { // should only implement ScriptsVisitor
-	
-	private static final ScriptValue<NoneType> NONE = new ScriptValue<>(null);
+
 	
 	protected final Context context;
 
@@ -62,7 +63,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	public void forceReturn() {
 		this.breaking = 'r';
 	}
-	
+
 	@Override
 	public ScriptValue<?> visit(ParseTree tree) {
 		if (breaking != 'n') return null;
@@ -75,12 +76,10 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	@Override
 	public ScriptValue<NoneType> visitStart(ScriptsParser.StartContext ctx) {
 		try {
-			visitChildren(ctx);
+			super.visitStart(ctx);
 		} catch (ScriptException e) {
-			CustomLogger.severe(e.getMessage());
-			if (CustomLogger.getLevel().intValue() <= 300) {
-				e.printStackTrace();
-			}
+			e.printStackTrace();
+
 		}
 		return NONE;
 	}
@@ -125,14 +124,16 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			iterator = Context.getIterator(ctx.expression().expression_part().function(0).VARIABLE().getText(),
 					visitArgs(ctx.expression().expression_part().function(0).arguments()));
 		if (iterator == null) {
-			ScriptValue<Object> exprToIterate = (ScriptValue<Object>) visitExpression(ctx.expression());
-			iterator = exprToIterate.iterator(ctx.FOR().getText() + " " + ctx.VARIABLE().getText() +
-					" " + ctx.IN().getText() + " " + ctx.expression().getText() + " {...}");
+			ScriptValue<?> exprToIterate = visitExpression(ctx.expression());
+			iterator = exprToIterate.iterator(context, new ScriptException.ScriptStackTraceElement(context,
+					ctx.FOR().getText() + " " + ctx.VARIABLE().getText() + " " + ctx.IN().getText() + " " +
+							ctx.expression().getText() + " {...}",
+					ctx.start));
 		}
 		while (iterator.hasNext()) {
 			if (breaking == 'c')
 				breaking = 'n';
-			context.assign(ctx.VARIABLE().getText(), iterator.next(), false);
+			context.assign(ctx.VARIABLE().getText(), iterator.next(), false, ctx.start.getLine(), ctx.start.getCharPositionInLine());
 			visit(ctx.block());
 			if (breaking == 'b') {
 				breaking = 'n';
@@ -160,18 +161,16 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			visit(ctx.block());
 		} catch (ScriptException e) {
 			for (ScriptsParser.Catch_blockContext catchCtx: ctx.catch_block()) {
-				List<ScriptsParser.ExpressionContext> expressions = catchCtx.expression();
-				for (int i = 0; i < expressions.size(); i++) {
-					ScriptValue<?> expr = visitExpression(expressions.get(i));
-					if (! expr.is(SVType.TEXT) && ! expr.is(SVType.BOOLEAN)) {
-						ScriptValueList<Object> arr = new ScriptValueList<>();
-						arr.add((ScriptValue<Object>) expr);
-						throw ScriptException.invalidType("try {...} catch ", "Text or Boolean", arr);
+				for (ScriptsParser.ExpressionContext expression : catchCtx.expression()) {
+					ScriptValue<?> expr = visitExpression(expression);
+					if (!expr.is(ScriptValueType.TEXT) && !expr.is(ScriptValueType.BOOLEAN)) {
+						throw ScriptException.invalidType("Text or Boolean", expr,
+								new ContextStackTraceElement(context,"try {...} catch", ctx.start));
 					}
-					if ( (expr.is(SVType.TEXT) && expr.asString().equals( e.getType() ))
-							| (expr.is(SVType.BOOLEAN) && expr.asBoolean())) {
-						if (catchCtx.varToAssign.size() > i && catchCtx.varToAssign.get(i) != null)
-							context.assign(catchCtx.varToAssign.get(i).getText(), expr, false);
+					if ((expr.is(ScriptValueType.TEXT) && expr.asString().equals(e.stringType))
+							|| (expr.is(ScriptValueType.BOOLEAN) && expr.asBoolean())) {
+						if (catchCtx.varToAssign != null)
+							context.assign(catchCtx.varToAssign.getText(), expr, false, catchCtx.start.getLine(), catchCtx.start.getCharPositionInLine());
 						visit(catchCtx.block());
 						return NONE;
 					}
@@ -220,9 +219,11 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			new ScriptThread(context, ctxToExecute, threadId).start();
 		} catch (InvalidNameException e) {
 			if (threadId != null)
-				throw new ScriptException(ExceptionType.UNAVAILABLE_THREAD_NAME, "thread " + ctx.expression(0).getText() + " ", threadId.toString(), "The name \"" + threadId.toString() + "\" is already taken by an other thread.");
+				throw new ScriptException(ExceptionType.UNAVAILABLE_THREAD_NAME, "The name \"" + threadId + "\" is already taken.",
+						new ContextStackTraceElement(context, "thread " + ctx.expression(0).getText(), ctx.start));
 			else
-				throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, "thread " + ctx.expression(0).getText() + " ", "<no id provided>", "This is an error that should not happen when no ID is specified.");
+				throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, "This is an error that should not happen when no ID is specified.",
+						new ContextStackTraceElement(context, "thread " + ctx.expression(0).getText(), ctx.start));
 		}
 		return NONE;
 	}
@@ -235,16 +236,22 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			new ScriptThread(context, ctxToExecute, threadId).start();
 		} catch (InvalidNameException e) {
 			if (threadId != null)
-				throw new ScriptException(ExceptionType.UNAVAILABLE_THREAD_NAME, "thread " + ctx.expression().getText() + " ", threadId.toString(), "The name \"" + threadId.toString() + "\" is already taken by an other thread.");
+				throw new ScriptException(ExceptionType.UNAVAILABLE_THREAD_NAME, "The name \"" + threadId + "\" is already taken.",
+						new ContextStackTraceElement(context, "thread " + ctx.expression().getText(), ctx.start));
 			else
-				throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, "thread " + ctx.expression().getText() + " ", "<no id provided>", "This is an error that should not happen when no ID is specified.");
+				throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, "This is an error that should not happen when no ID is specified.",
+						new ContextStackTraceElement(context, "thread " + ctx.expression().getText(), ctx.start));
 		}
 		return NONE;
 	}
 
 	@Override
 	public ScriptValue<?> visitThrow_(ScriptsParser.Throw_Context ctx) {
-		throw new ScriptException(visitExpression(ctx.expression(0)).asString(), "throw ", ctx.expression(0).getText(), ctx.expression().size() == 2 ? visitExpression(ctx.expression(1)).asString() : "<no error message provided>");
+		throw new ScriptException(visitExpression(ctx.expression(0)).asString(),
+				ctx.expression().size() == 2 ? visitExpression(ctx.expression(1)).asString() : "<no error message provided>",
+				new ContextStackTraceElement(context,
+						"throw " + ctx.expression(0).getText(),
+						ctx.start));
 	}
 
 	@Override
@@ -277,18 +284,21 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		}
 		for (ScriptsParser.SplatListContext splatCtx: ctx.splatList()) {
 			ScriptValue<?> visited = visitSplatList(splatCtx);
-			if ( ! visited.is(SVType.LIST))
-				throw ScriptException.invalidType("[splat] \"" + splatCtx.getText() + "\" ", "List", Types.getPrettyArg(visited), visited.type);
-			args.getArgsList().addAll(visited.asList());
+			if ( ! visited.is(ScriptValueType.LIST))
+				throw ScriptException.invalidType("List", visited,
+						new ContextStackTraceElement(context, "splat list: " + splatCtx.getText(), splatCtx.start));
 		}
 		for (ScriptsParser.SplatDictContext splatCtx: ctx.splatDict()) {
 			ScriptValue<?> visited = visitSplatDict(splatCtx);
-			if ( ! visited.is(SVType.DICTIONARY))
-				throw ScriptException.invalidType("[splat] \"" + splatCtx.getText() + "\" ", "Dictionary", Types.getPrettyArg(visited), visited.type);
+			if ( ! visited.is(ScriptValueType.DICTIONARY))
+				throw ScriptException.invalidType("Dictionary", visited,
+						new ContextStackTraceElement(context, "splat dictionary: " + splatCtx.getText(), splatCtx.start));
+
 			StringScriptValueMap<Object> argsMap = args.getArgsMap();
 			for (Map.Entry<ScriptValue<Object>, ScriptValue<Object>> entry: visited.asMap().entrySet()) {
-				if (! entry.getKey().is(SVType.TEXT))
-					throw ScriptException.invalidType("[splat] \"" + splatCtx.getText() + "\" ", "a Dictionary with only strings as keys", entry.getKey().toString(), entry.getKey().type);
+				if (! entry.getKey().is(ScriptValueType.TEXT))
+					throw ScriptException.invalidType("a Dictionary with only strings as keys", entry.getKey().toString(),
+							new ContextStackTraceElement(context, "splat dictionary : " + splatCtx.getText(), splatCtx.start));
 				argsMap.put(entry.getKey().asString(), entry.getValue());
 			}
 		}
@@ -305,28 +315,38 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		throw new UnsupportedOperationException("this method should never be called");
 	}
 	
-	public static ScriptValue<?> calculate(ScriptValue<?> a, Token operator, ScriptValue<?> b, String where, String varName) {return calculate(a, operator, b, where, varName, false);}
-	public static ScriptValue<?> calculate(ScriptValue<?> a, Token operator, ScriptValue<?> b, String where, String varName, boolean global) {
-		//System.out.println("calculate: " + a.v + operator.getText() + b.v);
-		ScriptException error = ScriptException.invalidOperator(where, a, operator.getText(), b);
+	public ScriptValue<?> calculate(ScriptValue<?> a, Token operator, ScriptValue<?> b, String where) {
+		return calculate(a, operator, b, where, false);
+	}
+
+	/**
+	 * @param global just used to thrown an error if that doesn't mean anything
+	 */
+	// todo for the documentation: a table with the description of what will an operator do with two types
+	public ScriptValue<?> calculate(ScriptValue<?> a, Token operator, ScriptValue<?> b, String where, boolean global) {
+		ScriptException error = new ScriptException(ExceptionType.INVALID_OPERATOR, context, "Invalid operator '" +
+				operator.getText() + "' between " + a.type.name + " and " + b.type.name,
+				new ContextStackTraceElement(context, a + operator.getText() + b, operator));
+		ScriptException globalError = new ScriptException(ExceptionType.GLOBAL_NOT_ALLOWED, "operator '" +
+				operator.getText() + "' between " + a.type.name + " and " + b.type.name + " cannot be used " +
+				"along with the keyword \"global\", that doesn't mean anything.", new ContextStackTraceElement(context,
+				where, operator));
 		switch (operator.getType()) {
 			case ScriptsParser.PLUS:
-				if (a.is(SVType.INTEGER) && b.is(SVType.INTEGER))
+				if (a.is(ScriptValueType.INTEGER) && b.is(ScriptValueType.INTEGER))
 					return new ScriptValue<>(a.asInteger() + b.asInteger());
 				else if (a.isNumber() && b.isNumber())
 					return new ScriptValue<>(a.asDouble() + b.asDouble());
-				else if ((a.is(SVType.TEXT) && (b.isNumber() || b.is(SVType.TEXT))) || (b.is(SVType.TEXT) && a.isNumber()))
-					return new ScriptValue<>(a.toString() + b.toString());
+				else if ((a.is(ScriptValueType.TEXT) && (b.isNumber() || b.is(ScriptValueType.TEXT))) || (b.is(ScriptValueType.TEXT) && a.isNumber()))
+					return new ScriptValue<>(a.toString() + b);
 				else {
 					if (global)
-						throw new ScriptException(ExceptionType.GLOBAL_NOT_ALLOWED, where, "",
-								"special function of operator '" + operator.getText() + "' between " + a.type + " and " +
-								b.type + " cannot be global, that doesn't mean anything.");
-					if (a.is(SVType.LIST)) {
+						throw globalError;
+					if (a.is(ScriptValueType.LIST)) {
 						a.asList().add((ScriptValue<Object>) b);
 						return NONE;
 					}
-					else if (a.is(SVType.DICTIONARY) && b.is(SVType.LIST)) {
+					else if (a.is(ScriptValueType.DICTIONARY) && b.is(ScriptValueType.LIST)) {
 						if (b.asList().size() != 2)
 							throw error;
 						a.asMap().put(b.asList().get(0), b.asList().get(1));
@@ -336,60 +356,49 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 						throw error;
 				}
 			case ScriptsParser.MINUS:
-				if (a.is(SVType.INTEGER) && b.is(SVType.INTEGER))
+				if (a.is(ScriptValueType.INTEGER) && b.is(ScriptValueType.INTEGER))
 					return new ScriptValue<>(a.asInteger() - b.asInteger());
 				else if (a.isNumber() && b.isNumber())
 					return new ScriptValue<>(a.asDouble() - b.asDouble());
 				else {
 					if (global)
-						throw new ScriptException(ExceptionType.GLOBAL_NOT_ALLOWED, where, "",
-								"special function of operator '" + operator.getText() + "' between " + a.type + " and " +
-								b.type + " cannot be global, that doesn't mean anything.");
-					if (a.is(SVType.LIST)) {
-						if (! b.is(SVType.INTEGER))
-							throw error;
-						//noinspection SuspiciousMethodCalls
-						a.asList().remove(b.asInteger());
+						throw globalError;
+					if (a.is(ScriptValueType.LIST)) {
+						if (! b.is(ScriptValueType.INTEGER))
+							a.asList().remove(b);
+						else
+							a.asList().remove(b.asInteger());
 						return NONE;
 					}
-					else if (a.is(SVType.DICTIONARY)) {
-						if (! a.asMap().containsKey(b))
-							throw new ScriptException(ExceptionType.NOT_DEFINED, where, varName + "[" + Types.getPrettyArg(b) + "]", "you tried to remove element " + Types.getPrettyArg(b) + " of Dictionary " + varName +
-									" but it's not there. You can call \"" + varName + ".keyList\" to get a list of keys.");
+					else if (a.is(ScriptValueType.DICTIONARY)) {
 						a.asMap().remove(b);
 						return NONE;
 					}
 					else throw error;
 				}
-				//break;
 			case ScriptsParser.TIMES:
 				if (!(a.isNumber()&&b.isNumber())) throw error;
-				if (a.is(SVType.INTEGER) && b.is(SVType.INTEGER))
+				if (a.is(ScriptValueType.INTEGER) && b.is(ScriptValueType.INTEGER))
 					return new ScriptValue<>(a.asInteger() * b.asInteger());
 				else
 					return new ScriptValue<>(a.asDouble() * b.asDouble());
-				//break;
 			case ScriptsParser.DIVIDE:
 				if (!(a.isNumber()&&b.isNumber())) throw error;
 				return new ScriptValue<>(a.asDouble() / b.asDouble());
-				//break;
 			case ScriptsParser.FLOOR_DIVIDE:
 				return new ScriptValue<>((int) (a.asDouble() / b.asDouble()));
-				//break;
 			case ScriptsParser.MODULO:
 				if (!(a.isNumber()&&b.isNumber())) throw error;
-				if (a.is(SVType.INTEGER) && b.is(SVType.INTEGER))
+				if (a.is(ScriptValueType.INTEGER) && b.is(ScriptValueType.INTEGER))
 					return new ScriptValue<>(a.asInteger() % b.asInteger());
 				else
 					return new ScriptValue<>(a.asDouble() % b.asDouble());
-				//break;
 			case ScriptsParser.POW:
 				if (!(a.isNumber()&&b.isNumber())) throw error;
-				if (a.is(SVType.INTEGER) && b.is(SVType.INTEGER))
-					return new ScriptValue<>((int) Math.round(Math.pow(a.asInteger(), b.asInteger())));
+				if (a.is(ScriptValueType.INTEGER) && b.is(ScriptValueType.INTEGER))
+					return new ScriptValue<>((int) Math.pow(a.asInteger(), b.asInteger()));
 				else
 					return new ScriptValue<>(Math.pow(a.asDouble(), b.asDouble()));
-				//break;
 			default:
 				throw error;
 		}
@@ -403,10 +412,13 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 
 		if (ctx.operator != null) {
 			ScriptValue<?> varValue = context.callAndRun(varName);
-			context.assign(varName, calculate(varValue, ctx.operator, value.clone(), ctx.getText(), varName, global), global);
+			context.assign(varName,
+					calculate(varValue, ctx.operator, value.clone(), ctx.getText(), global),
+					global,
+					ctx.start);
 		}
 		else
-			context.assign(varName, value.clone(), global);
+			context.assign(varName, value.clone(), global, ctx.start);
 		return NONE;
 	}
 	
@@ -416,59 +428,51 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		return NONE;
 	}
 	
-	protected ScriptValue<?> get_from_list(ScriptValue<?> obj, ScriptsParser.Get_from_listContext getFromListContext, String nameOfVar) {
+	protected ScriptValue<?> get_from_list(ScriptValue<?> obj, ScriptsParser.Get_from_listContext getFromListContext, String scriptCause) {
 		if (getFromListContext.nbSingle != null) {
-			if (obj.is(SVType.LIST)) {
+			if (obj.is(ScriptValueType.LIST)) {
 				int number = visitExpression(getFromListContext.nbSingle).asInteger();
 				int size = obj.asList().size();
-				if (number >= size || number <= -size) {
-					throw new ScriptException(ExceptionType.OUT_OF_BOUNDS, "[get element from list] ", nameOfVar + "[" + number + "]", "you asked for element " + number + " of List " + nameOfVar +
-							" but it contains only " + size + " elements, so you can ask for element from " + (-size + 1) + " to " + (size - 1));
-				}
+				if (number >= size || number <= -size)
+					throw getOutOfBoundsException(scriptCause, number, size, getFromListContext.start);
 				if (number < 0) number += size;
 				return obj.asList().get(number);
 			}
-			else if (obj.is(SVType.DICTIONARY)) {
+			else if (obj.is(ScriptValueType.DICTIONARY)) {
 				ScriptValue<?> key = visitExpression(getFromListContext.nbSingle);
-				ScriptValue<?> element = obj.asMap().get(key);
-				if (element == null) {
-					throw new ScriptException(ExceptionType.NOT_DEFINED, "[get element from list] ", nameOfVar + "[" + Types.getPrettyArg(key) + "]", "you asked for element " + Types.getPrettyArg(key) + " of Dictionary " + nameOfVar +
-							" but it does not exist. You can call \"" + nameOfVar + ".keyList\" to get a list of keys.");
+				try {
+					return obj.asMap().get(key);
+				} catch (ScriptException.Incomplete e) {
+					throw e.complete(new ContextStackTraceElement(context, scriptCause, getFromListContext.start));
 				}
-				return element;
 			}
-			else if (obj.is(SVType.TEXT)) {
+			else if (obj.is(ScriptValueType.TEXT)) {
 				int number = visitExpression(getFromListContext.nbSingle).asInteger();
 				int size = obj.asString().length();
-				if (number >= size || number <= -size) {
-					throw new ScriptException(ExceptionType.OUT_OF_BOUNDS, "[get element from list] ", nameOfVar + "[" + number + "]", "you asked for character " + number + " of List " + nameOfVar +
-							" but it contains only " + size + " elements, so you can ask for element from " + (-size + 1) + " to " + (size - 1));
-				}
+				if (number >= size || number <= -size)
+					throw getOutOfBoundsException(scriptCause, number, size, getFromListContext.start);
 				if (number < 0) {
 					number += size;
 				}
 				return new ScriptValue<>(String.valueOf(obj.asString().charAt(number)));
 			}
 			else
-				throw new ScriptException(ExceptionType.NOT_LISTABLE, "[get element from list] ", nameOfVar + '[' + getFromListContext.nbSingle.getText() + ']', nameOfVar +
-						" isn't a List, a Dictionary or Text, so you can't ask for a specific element in it");
+				throw new ScriptException(ExceptionType.NOT_LISTABLE, scriptCause +
+						" isn't a List, a Dictionary or Text, so you can't ask for a specific element in it",
+						new ContextStackTraceElement(context, scriptCause, getFromListContext.start));
 		}
 		else {
-			if (obj.is(SVType.LIST)) {
+			if (obj.is(ScriptValueType.LIST)) {
 				Integer nb1 = getFromListContext.nb1 == null ? null : visitExpression(getFromListContext.nb1).asInteger();
 				Integer nb2 = getFromListContext.nb2 == null ? null : visitExpression(getFromListContext.nb2).asInteger();
 				if (nb1 == null && nb2 == null)
 					return obj;
 				int size = obj.asList().size();
-				String funcArgs = nameOfVar + "[" + toEmptyStringIfNull(nb1) + ":" + toEmptyStringIfNull(nb2) + "]";
 				if (nb1 != null && (nb1 >= size || nb1 <= -size)) {
-					throw new ScriptException(ExceptionType.OUT_OF_BOUNDS, "[get element from list] ", funcArgs, "you asked for element " + nb1 + " of List " + nameOfVar +
-							" but it contains only " + size + " elements, so you can ask for element from " + (-(size - 1)) + " to " + (size - 1));
+					throw getOutOfBoundsException(scriptCause, nb1, size, getFromListContext.start);
 				}
-				if (nb2 != null && (nb2 >= size || nb2 <= -size)) {
-					throw new ScriptException(ExceptionType.OUT_OF_BOUNDS, "[get element from list] ", funcArgs, "you asked for element " + nb2 + " of List " + nameOfVar +
-							" but it contains only " + size + " elements, so you can ask for element from " + (-(size - 1)) + " to " + (size - 1));
-				}
+				if (nb2 != null && (nb2 >= size || nb2 <= -size))
+					throw getOutOfBoundsException(scriptCause, nb2, size, getFromListContext.start);
 				if (nb1 != null) {
 					if (nb1 < 0)
 						nb1 += size;
@@ -488,25 +492,28 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 					return new ScriptValue<>(obj.asList().subList(0, nb2));
 				}
 			}
-			else if (obj.is(SVType.TEXT)) {
-				Integer nb1 = visitExpression(getFromListContext.nb1).asInteger();
-				Integer nb2 = visitExpression(getFromListContext.nb2).asInteger();
-				if (nb1 == null && nb2 == null)
+			else if (obj.is(ScriptValueType.TEXT)) {
+				boolean noNb1 = false, noNb2 = false;
+				int nb1 = 0, nb2 = 0;
+
+				if (getFromListContext.nb1 == null) noNb1 = true;
+				else nb1 = visitExpression(getFromListContext.nb1).asInteger();
+
+				if (getFromListContext.nb2 == null) noNb2 = true;
+				else nb2 = visitExpression(getFromListContext.nb2).asInteger();
+
+				if (noNb1 && noNb2)
 					return obj;
 				int size = obj.asString().length();
-				if (nb1 != null && (nb1 >= size || nb1 <= -size)) {
-					throw new ScriptException(ExceptionType.OUT_OF_BOUNDS, "[get element from list] ", nameOfVar + "[" + nb1 + ":" + toEmptyStringIfNull(nb2) + "]", "you asked for character " + nb1 + " of Text " + nameOfVar +
-							" but it contains only " + size + " elements, so you can ask for element from " + (-(size - 1)) + " to " + (size - 1));
-				}
-				if (nb2 != null && (nb2 >= size || nb2 <= -size)) {
-					throw new ScriptException(ExceptionType.OUT_OF_BOUNDS, "[get element from list] ", nameOfVar + "[" + toEmptyStringIfNull(nb2) + ":" + nb2 + "]", "you asked for character " + nb2 + " of Text " + nameOfVar +
-							" but it contains only " + size + " elements, so you can ask for element from " + (-(size - 1)) + " to " + (size - 1));
-				}
-				if (nb1 != null) {
+				if (!noNb1 && (nb1 >= size || nb1 <= -size))
+					throw getOutOfBoundsException(scriptCause, nb1, size, getFromListContext.start);
+				if (!noNb2 && (nb2 >= size || nb2 <= -size))
+					throw getOutOfBoundsException(scriptCause, nb2, size, getFromListContext.start);
+				if (!noNb1) {
 					if (nb1 < 0)
 						nb1 += size;
-						
-					if (nb2 != null) {
+
+					if (!noNb2) {
 						if (nb2 < 0)
 							nb2 += size;
 						return new ScriptValue<>(obj.asString().substring(nb1, nb2));
@@ -524,12 +531,21 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			else {
 				String nb1 = getFromListContext.nb1 == null ? "" : getFromListContext.nb1.getText();
 				String nb2 = getFromListContext.nb2 == null ? "" : getFromListContext.nb2.getText();
-				throw new ScriptException(ExceptionType.NOT_LISTABLE, "[get element from list] ", nameOfVar + '[' + nb1 + ':' + nb2 + ']', nameOfVar +
-						" isn't a List, a Dictionary or Text, so you can't ask for a specific element in it");
+				throw new ScriptException(ExceptionType.NOT_LISTABLE, scriptCause +
+						" isn't a List, a Dictionary or Text, so you can't ask for a specific element in it",
+						new ContextStackTraceElement(context,
+								scriptCause + '[' + nb1 + ':' + nb2 + ']', getFromListContext.start));
 			}
 		}
 	}
-	
+
+	@NotNull
+	private ScriptException getOutOfBoundsException(String nameOfVar, int index, int size, Token startToken) {
+		return new ScriptException(ExceptionType.OUT_OF_BOUNDS, "you asked for element " + index +
+				" of List " + nameOfVar + " but it contains only " + size + " elements, so you can ask for element from " +
+				(-size + 1) + " to " + (size - 1), new ContextStackTraceElement(context, nameOfVar, startToken));
+	}
+
 	@Override
 	public ScriptValue<Double> visitExprDecimal(ScriptsParser.ExprDecimalContext ctx) {
 		return new ScriptValue<>(Double.valueOf(ctx.DECIMAL().getText().replace("_", "")));
@@ -573,7 +589,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	public ScriptValue<?> visitExprParExpr(ScriptsParser.ExprParExprContext ctx) {
 		ScriptValue<?> expr = visitExpression(ctx.expression());
 		for (ScriptsParser.Get_from_listContext getFromListContext : ctx.get_from_list()) {
-			expr = get_from_list(expr, getFromListContext, ctx.expression().getText());
+			expr = get_from_list(expr, getFromListContext, ctx.getText());
 		}
 		return expr;
 	}
@@ -582,7 +598,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	public ScriptValue<ScriptValueList<Object>> visitExprList(ScriptsParser.ExprListContext ctx) {
 		ScriptValue<ScriptValueList<Object>> list = visitList(ctx.list());
 		for (ScriptsParser.Get_from_listContext getFromListContext: ctx.get_from_list()) {
-			list = (ScriptValue<ScriptValueList<Object>>) get_from_list(list, getFromListContext, ctx.list().getText());
+			list = (ScriptValue<ScriptValueList<Object>>) get_from_list(list, getFromListContext, ctx.getText());
 		}
 		return list;
 	}
@@ -591,7 +607,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	public ScriptValue<ScriptValueMap<Object, Object>> visitExprDictionary(ScriptsParser.ExprDictionaryContext ctx) {
 		ScriptValue<ScriptValueMap<Object, Object>> dict = visitDictionary(ctx.dictionary());
 		for (ScriptsParser.Get_from_listContext getFromListContext : ctx.get_from_list()) {
-			dict = (ScriptValue<ScriptValueMap<Object, Object>>) get_from_list(dict, getFromListContext, ctx.dictionary().getText());
+			dict = (ScriptValue<ScriptValueMap<Object, Object>>) get_from_list(dict, getFromListContext, ctx.getText());
 		}
 		return dict;
 	}
@@ -608,9 +624,10 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		ScriptValueList<Object> list = new ScriptValueList<>();
 		ScriptValue<?> exprToIterate = visitExpression(ctx.expression(1));
 		ScriptsParser.ComparisonContext ifStatement = ctx.comparison();
-		Iterator<ScriptValue<?>> iterator = exprToIterate.iterator(ctx.getText());
+		Iterator<ScriptValue<?>> iterator = exprToIterate.iterator(
+				new ContextStackTraceElement(context, ctx.getText(), ctx.start));
 		while (iterator.hasNext()) {
-			context.assign(ctx.VARIABLE().getText(), iterator.next(), false);
+			context.assign(ctx.VARIABLE().getText(), iterator.next(), false, ctx.start);
 			if (determineBoolean(visitComparison(ifStatement)))
 				list.add((ScriptValue<Object>) visitExpression(ctx.expression(0)));
 		}
@@ -621,7 +638,6 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	public ScriptValue<ScriptValueMap<Object, Object>> visitDictionary(ScriptsParser.DictionaryContext ctx) {
 		if (ctx.FOR() == null) {
 			ScriptValueMap<Object, Object> map = new ScriptValueMap<>();
-			//noinspection SpellCheckingInspection
 			Iterator<ScriptsParser.ExpressionContext> iter = ctx.expression().iterator();
 			while (iter.hasNext()) {
 				map.put((ScriptValue<Object>) visitExpression(iter.next()), (ScriptValue<Object>) visitExpression(iter.next()));
@@ -631,9 +647,11 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		ScriptValueMap<Object, Object> map = new ScriptValueMap<>();
 		ScriptsParser.ComparisonContext ifStatement = ctx.comparison();
 		ScriptValue<?> exprToIterate = visitExpression(ctx.expression(2));
-		Iterator<ScriptValue<?>> iterator = exprToIterate.iterator(ctx.getText());
+		Iterator<ScriptValue<?>> iterator = exprToIterate.iterator(
+				new ContextStackTraceElement(context, ctx.getText(), ctx.start));
+
 		while (iterator.hasNext()) {
-			context.assign(ctx.VARIABLE().getText(), iterator.next(), false);
+			context.assign(ctx.VARIABLE().getText(), iterator.next(), false, ctx.start);
 			if (determineBoolean(visitComparison(ifStatement)))
 				map.put((ScriptValue<Object>) visitExpression(ctx.expression(0)), (ScriptValue<Object>) visitExpression(ctx.expression(1)));
 		}
@@ -645,20 +663,10 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		ScriptValue<?> before = visitComp_molecule(ctx.comp_molecule(0));
 		for (int i = 1; i < ctx.comp_molecule().size(); i++) {
 			before = new ScriptValue<>(executeIf(before, ctx.operator.get(i-1), ctx.comp_molecule(i)));
-			/*
-			if (ctx.operator.get(i-1).getType() == ScriptsParser.AND)
-				before = new ScriptValue<>(before.asBoolean() && visitComp_molecule(ctx.comp_molecule(i)).asBoolean());
-			else
-				before = new ScriptValue<>(before.asBoolean() || visitComp_molecule(ctx.comp_molecule(i)).asBoolean());
-			 */
-				
 		}
 		return before;
 	}
 
-	public boolean executeIf(@NotNull ScriptsParser.Comp_moleculeContext a, @NotNull Token andOr, @NotNull ScriptsParser.Comp_moleculeContext b) {
-		return executeIf(determineBoolean(visitComp_molecule(a)), andOr, b);
-	}
 	public boolean executeIf(ScriptValue<?> a, @NotNull Token andOr, @NotNull ScriptsParser.Comp_moleculeContext b) {
 		return executeIf(determineBoolean(a), andOr, b);
 	}
@@ -709,7 +717,9 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 							before = new ScriptValue<>(before.asString().contains(visitComp_atom(ctx.comp_atom(i)).asString()));
 							break;
 						default:
-							throw new ScriptException(ExceptionType.NOT_A_CONTAINER, "\"in\"", ctx.getText(), before.v + " is not a container, you can't check if something is or isn't in it. Containers are List, Dictionary and Text.");
+							throw new ScriptException(ExceptionType.NOT_LISTABLE, before.v +
+									" is not a container, you can't check if something is or isn't in it. Containers are List, Dictionary and Text.",
+									new ContextStackTraceElement(context, ctx.getText(), ctx.start));
 					}
 					break;
 				default:
@@ -743,7 +753,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		ScriptValue<?> before = visitMultiplication(ctx.multiplication(0));
 		for (int i = 1; i < ctx.multiplication().size(); i++) {
 			before = calculate(before, ctx.operator.get(i-1), visitMultiplication(ctx.multiplication(i)),
-					ctx.multiplication(i-1).getText() + " " + ctx.operator.get(i-1).getText() + " " + ctx.multiplication(i).getText(), ctx.multiplication(i-1).getText());
+					ctx.multiplication(i-1).getText() + " " + ctx.operator.get(i-1).getText() + " " + ctx.multiplication(i).getText());
 		}
 		return before;
 	}
@@ -753,7 +763,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		ScriptValue<?> before = visitPow(ctx.pow(0));
 		for (int i = 1; i < ctx.pow().size(); i++) {
 			before = calculate(before, ctx.operator.get(i-1), visitPow(ctx.pow(i)),
-					ctx.pow(i-1).getText() + " " + ctx.operator.get(i-1).getText() + " " + ctx.pow(i).getText(), ctx.pow(i-1).getText());
+					ctx.pow(i-1).getText() + " " + ctx.operator.get(i-1).getText() + " " + ctx.pow(i).getText());
 		}
 		return before;
 	}
@@ -761,10 +771,10 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	@Override
 	public ScriptValue<?> visitPow(ScriptsParser.PowContext ctx) {
 		if (ctx.rigth1 != null) {
-			return calculate(visitMaths_atom(ctx.left), ctx.POW().getSymbol(), visitMaths_atom(ctx.rigth1), ctx.getText(), ctx.left.getText());
+			return calculate(visitMaths_atom(ctx.left), ctx.POW().getSymbol(), visitMaths_atom(ctx.rigth1), ctx.getText());
 		}
 		if (ctx.rigth2 != null) {
-			return calculate(visitMaths_atom(ctx.left), ctx.POW().getSymbol(), visitPow(ctx.rigth2), ctx.getText(), ctx.left.getText());
+			return calculate(visitMaths_atom(ctx.left), ctx.POW().getSymbol(), visitPow(ctx.rigth2), ctx.getText());
 		}
 		return visitMaths_atom(ctx.left);
 	}
@@ -774,12 +784,13 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		ScriptValue<?> value;
 		if (ctx.MINUS() != null) {
 			value = visitMaths_atom(ctx.maths_atom());
-			if (value.is(SVType.INTEGER))
+			if (value.is(ScriptValueType.INTEGER))
 				value = new ScriptValue<>(-value.asInteger());
-			else if (value.is(SVType.DECIMAL))
+			else if (value.is(ScriptValueType.DECIMAL))
 				value = new ScriptValue<>(-value.asDouble());
 			else
-				throw ScriptException.invalidType("[negate] ", "Integer or Decimal for negating it", Types.getPrettyArg(value), value.type);
+				throw ScriptException.invalidType("Integer or Decimal for negating it", value,
+						new ContextStackTraceElement(context, ctx.getText(), ctx.start));
 		}
 		else if (ctx.expression_part() != null)
 			value = visitExpression_part(ctx.expression_part());
@@ -831,7 +842,8 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			String message = "no further information provided in the \"assert\" statement";
 			if (ctx.expression() != null)
 				message = visitExpression(ctx.expression()).toString();
-			throw new ScriptException(ExceptionType.ASSERTION_ERROR, "assert", ctx.comparison().getText(), message);
+			throw new ScriptException(ExceptionType.ASSERTION_ERROR, message,
+					new ContextStackTraceElement(context, "assert " + ctx.comparison().getText(), ctx.start));
 		}
 		return NONE;
 	}
@@ -867,12 +879,6 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	@Override
 	public ScriptValue<?> visitF_text_placeholder(ScriptsParser.F_text_placeholderContext ctx) {
 		return visitExpression(ctx.expression());
-	}
-
-	private @NotNull
-	static String toEmptyStringIfNull(@Nullable Object obj) {
-		if (obj == null) return "";
-		return obj.toString();
 	}
 	
 }

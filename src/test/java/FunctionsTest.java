@@ -15,6 +15,7 @@
  */
 
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ContainingScripts;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
 import fr.bananasmoothii.scriptcommands.core.execution.Args;
@@ -35,7 +36,7 @@ public class FunctionsTest {
     @Test
     @Order(1)
     void testArgs() {
-        Context context = new Context(null);
+        Context context = new Context("testArgs", ContainingScripts.Type.FUNCTION);
 
         Args.NamingPattern np = new Args.NamingPattern()
                 .setNamingPattern(1, "stop")

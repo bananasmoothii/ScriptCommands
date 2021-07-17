@@ -71,7 +71,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             try {
                 Storage.executeSQLUpdate(query);
             } catch (SQLException e) {
-                throw ScriptException.toScriptException(e, 1, query);
+                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
             }
         } else {
             arrayList = new ArrayList<>();
@@ -135,13 +135,12 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             lastSize = rs.getInt(1);
             return lastSize;
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, 1, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
     @Override
     public boolean add(ScriptValue<E> element) {
-        if (element.v == this) throw new ElementIsCollectionException();
         if (arrayList != null) {
             boolean returned = arrayList.add(element);
             if (returned) modified();
@@ -157,14 +156,12 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             modified();
             return true;
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
     @Override
     public void add(int index, ScriptValue<E> element) {
-        if (element.v == this) throw new ElementIsCollectionException();
-
         if (arrayList != null) {
             arrayList.add(index, element);
             modified();
@@ -175,8 +172,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
         try {
             Storage.executeSQLUpdate(query);
         } catch (SQLException e) {
-            ScriptException.appendToSQLExceptionQuery(e, query);
-            e.printStackTrace();
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
         query = "INSERT INTO `" + SQLTable + "` VALUES(?, ?, ?)";
         try {
@@ -187,7 +183,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             ps.executeUpdate();
             modified();
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -209,7 +205,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             query += " => " + ps;
             modified();
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
         return previousElement;
     }
@@ -225,10 +221,6 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
         if (index >= size())
             throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + size());
     }
-
-    /*public boolean addAll(ScriptValueList<E> c) {
-        return super.addAll(c);
-    }*/
 
     /**
      * If this returns {@code null}, it means there was an error, because if this works, it should return
@@ -246,7 +238,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             rs.next();
             return (ScriptValue<E>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2));
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -254,7 +246,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
      * Removes the element at the specified position in this list (optional
      * operation).  Shifts any subsequent elements to the left (subtracts one
      * from their indices).  Returns the element that was removed from the
-     * list.<br/>
+     * list.
      * If this returns {@code null}, it means there was an error, because if this works, it should return
      * a <code>{@link ScriptValue}<{@link fr.bananasmoothii.scriptcommands.core.execution.NoneType NoneType}></code>
      * @param index the index of the element to be removed
@@ -273,14 +265,14 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
         try {
             Storage.executeSQLUpdate(query);
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
         query = "UPDATE `" + SQLTable + "` SET `index` = `index` - 1 WHERE `index` > " + index;
         try {
             Storage.executeSQLUpdate(query);
             modified();
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
         return previous;
     }
@@ -317,7 +309,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
                 newList.add((ScriptValue<E>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2)));
             }
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
         return newList;
     }
@@ -338,7 +330,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             }
             return false;
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -382,17 +374,6 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
         }
         clone.addAll(this); // element are cloned since the come from a string in SQL
         return clone;
-
-        /*
-        try {
-            ScriptValueList<E> clone = (ScriptValueList<E>) super.clone();
-            clone.useSQLIfPossible = false;
-            return clone;
-        } catch (CloneNotSupportedException e) {
-            throw ScriptException.toScriptException(e);
-        }
-
-         */
     }
 
     @Override
@@ -416,7 +397,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             arrayList = copy;
             stringID = StringIDBeforeTry;
             SQLTable = null;
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -470,6 +451,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
     /**
      * Contrary of {@link ScriptValueList#toNormalClasses(boolean)}
      * @param keysAreJson whether the keys of hashMaps should be a json of the real key, because in json, every key is a string.
+     *
      */
     public static <T> ScriptValueList<? extends T> toScriptValues(List<T> list, boolean keysAreJson) {
         return (ScriptValueList<? extends T>) toScriptValues(list.toArray(), keysAreJson);

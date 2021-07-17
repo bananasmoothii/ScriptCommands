@@ -34,7 +34,7 @@ import java.util.HashMap;
  *     <li>{@code boolean directScripts}</li>
  *     <li>{@code static boolean errorsOnLastParsing}</li>
  * </ul>
- * and everything is public.<br/>
+ * and everything is public.
  * There is one constructor, used to initialize the default fields and have no repeated code
  */
 @SuppressWarnings("unchecked")

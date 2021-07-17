@@ -177,7 +177,7 @@ public abstract class Config {
     }
 
     /**
-     * Used to get the corresponding {@link ContainingScripts}<br/>
+     * Used to get the corresponding {@link ContainingScripts}
      * for getting a schedule, <strong>name</strong> will be {@code "Schedule N° " + (i + 1)}, as schedules start at 1.
      * @return {@code null} if it doesn't exist
      * @throws IllegalArgumentException if <strong>type</strong> is not "commands", "functions", "schedules" or "events".

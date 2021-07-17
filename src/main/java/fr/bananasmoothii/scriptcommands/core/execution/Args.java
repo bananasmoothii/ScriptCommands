@@ -24,6 +24,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.regex.Pattern;
 
+import static fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType.INVALID_ARGUMENTS;
+
 public class Args {
 
     public static class Arg {
@@ -129,34 +131,18 @@ public class Args {
         return this;
     }
 
-    /*
-    public ScriptValue<Object> getArgNumber(int i) {
-        if (i >= argsList.size()) {
-            String argName = "";
-            if (namingPattern != null) {
-                argName = namingPattern.getNameForArg(i, argsList.size());
-                if (argName != null)
-                    argName = "('" + argName + "') ";
-            }
-            throw new ScriptException(ScriptException.ExceptionType.INVALID_ARGUMENTS, StackTraceUtils.getFromStackTrace(0), ScriptValueList.toScriptValues(argsList),
-                    "Argument number " + i + argName + " was not defined but is mandatory.");
-        }
-        return argsList.get(i).value;
-    }
-    */
-
     /**
      * This method tries to get an argument according to the {@link NamingPattern} (set in {@link #setNamingPattern(NamingPattern)}).
      * Note: as this can be a little slower than a simple getter, consider storing the result somewhere for not spamming that too much.
      * @param argName the name of an arg, specified by the {@link NamingPattern} or by the user with {@code arg1="some value"}
      * @return the matching {@link ScriptValue}
-     * @throws ScriptException (type: {@link fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType#INVALID_ARGUMENTS INVALID_ARGUMENTS})
+     * @throws ScriptException (type: {@link ScriptException.ExceptionType#INVALID_ARGUMENTS INVALID_ARGUMENTS})
      * @see #getArgIfExist(String) getArgIfExist(String) - if you just want a null if that arg doesn't exists.
      */
     public @NotNull ScriptValue<Object> getArg(String argName) {
         ScriptValue<Object> arg = getArgIfExist(argName);
         if (arg == null)
-            throw new ScriptException(ScriptException.ExceptionType.INVALID_ARGUMENTS, StackTraceUtils.getFromStackTrace(0), ScriptValueList.toScriptValues(argsList),
+            throw new ScriptException(INVALID_ARGUMENTS, context,
                     "Argument " + argName + " was not defined but is mandatory.");
         return arg;
     }
@@ -189,14 +175,13 @@ public class Args {
     /**
      * This is an easier and faster way to get one single arguments, if you know there should be one. There is no
      * need for a {@link NamingPattern} if you use this.
-     * @throws ScriptException (type: {@link fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType#INVALID_ARGUMENTS INVALID_ARGUMENTS})
+     * @throws ScriptException (type: {@link ScriptException.ExceptionType#INVALID_ARGUMENTS INVALID_ARGUMENTS})
      * if there isn't one arg in total.
      */
     public @NotNull ScriptValue<Object> getSingleArg() {
         if (argsList.size() == 1 && argsMap.size() == 0) return argsList.get(0);
         if (argsMap.size() == 1 && argsList.size() == 0) return argsMap.values().get(0);
-        throw new ScriptException(ScriptException.ExceptionType.INVALID_ARGUMENTS, StackTraceUtils.getFromStackTrace(0), ScriptValueList.toScriptValues(argsList),
-                "There should be one argument.");
+        throw new ScriptException(INVALID_ARGUMENTS, context, "There should be only one argument to this function.");
     }
 
     public @NotNull ScriptValueList<Object> getRemainingArgsList() {

@@ -25,14 +25,6 @@ import java.sql.SQLException;
 
 public interface ScriptValueCollection extends Cloneable {
 
-    /*
-    /**
-     * This will clone the collection, every element of it, and these element will clone every element of <i>their</i> collection and so on
-     * @return A clone of this list with every element cloned too
-     *
-    ScriptValueCollection recursiveClone();
-    */
-
     /**
      * to use {@link java.util.ArrayList} and {@link java.util.HashMap} again. <br/>
      * For instance, a {@link ScriptValueList} of {@link ScriptValue} of String will be converted to an {@code ArrayList<String>}.
@@ -110,7 +102,7 @@ public interface ScriptValueCollection extends Cloneable {
      */
     static void setScriptValueInPreparedStatement(PreparedStatement ps, ScriptValue<?> element, int objectIndex, int typeIndex) throws SQLException {
         if (! Storage.isSQL) throw new NullPointerException("the storage class isn't using SQL");
-        if (element == null || element.is(ScriptValue.SVType.NONE)) {
+        if (element == null || element.is(ScriptValue.ScriptValueType.NONE)) {
             ps.setString(objectIndex, null);
         } else if (element.v instanceof ScriptValueCollection) {
             ScriptValueCollection collection = (ScriptValueCollection) element.v;
@@ -118,7 +110,7 @@ public interface ScriptValueCollection extends Cloneable {
                 collection.makeSQL();
             }
             ps.setString(objectIndex, collection.getStringID().toString());
-        } else if (element.is(ScriptValue.SVType.BOOLEAN)) {
+        } else if (element.is(ScriptValue.ScriptValueType.BOOLEAN)) {
             ps.setString(objectIndex, element.asBoolean() ? "" : null);
         } else {
             ps.setString(objectIndex, element.toString());

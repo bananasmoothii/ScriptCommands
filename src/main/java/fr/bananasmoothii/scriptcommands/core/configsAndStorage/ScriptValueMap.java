@@ -74,7 +74,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             try {
                 Storage.executeSQLUpdate(query);
             } catch (SQLException e) {
-                throw ScriptException.toScriptException(e, 1, query);
+                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
             }
         } else {
             hashMap = new HashMap<>();
@@ -139,7 +139,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             lastSize = rs.getInt(1);
             return lastSize;
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, 1, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -159,7 +159,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             }
             return false;
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -179,17 +179,16 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             }
             return false;
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
     /**
      * If this returns {@code null}, it means there was an error or your key wasn't a {@link ScriptValue},
      * because if this works, it should return a
-     * <code>{@link ScriptValue}<{@link fr.bananasmoothii.scriptcommands.core.execution.NoneType NoneType}></code><br/>
-     * This works differently than a normal {@link HashMap#get(Object)} because here if the elements
-     * absent, it will throw a ScriptException
-     * @throws ScriptException if element is absent
+     * <code>{@link ScriptValue}<{@link fr.bananasmoothii.scriptcommands.core.execution.NoneType NoneType}></code>
+     * @return the object if found, a {@link ScriptValue}<{@link fr.bananasmoothii.scriptcommands.core.execution.NoneType}>
+     *     otherwise
      */
     @Override
     public ScriptValue<V> get(Object key) {
@@ -201,11 +200,10 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             ScriptValueCollection.setScriptValueInPreparedStatement(ps, (ScriptValue<V>) key, 1, 2);
             query += " => " + ps;
             ResultSet rs = ps.executeQuery();
-            if (!rs.next()) throw new ScriptException(ScriptException.ExceptionType.NOT_DEFINED, "[get element from list] ", "", "you asked for element '" + key.toString() + "' of a Dictionary " +
-                    "but it does not exist. You can call \"your_dictionary.keyList\" to get a list of keys."); // similar to what there is in ScriptValueExecutor
+            if (!rs.next()) return new ScriptValue<>(null);
             return (ScriptValue<V>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2));
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -228,7 +226,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                     query += " => " + ps;
                     ps.executeUpdate();
                 } catch (SQLException e) {
-                    throw ScriptException.toScriptException(e, query);
+                    throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
                 }
             } else {
                 String query = "INSERT INTO `" + SQLTable + "` VALUES(?, ?, ?, ?)";
@@ -239,7 +237,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                     query += " => " + ps;
                     ps.executeUpdate();
                 } catch (SQLException e) {
-                    throw ScriptException.toScriptException(e, query);
+                    throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
                 }
             }
         }
@@ -259,7 +257,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                 query += " => " + ps;
                 ps.executeUpdate();
             } catch (SQLException e) {
-                throw ScriptException.toScriptException(e, query);
+                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
             }
         }
         modified();
@@ -294,7 +292,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                             try {
                                 return rs.next();
                             } catch (SQLException e) {
-                                throw ScriptException.toScriptException(e, 4, query);
+                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
                             }
                         }
 
@@ -303,7 +301,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                             try {
                                 return (ScriptValue<K>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2));
                             } catch (SQLException e) {
-                                throw ScriptException.toScriptException(e, query);
+                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
                             }
                         }
                     };
@@ -315,7 +313,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                 }
             };
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -332,7 +330,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             }
             return list;
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -362,7 +360,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                             try {
                                 return rs.next();
                             } catch (SQLException e) {
-                                throw ScriptException.toScriptException(e, 4, query);
+                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
                             }
                         }
 
@@ -385,7 +383,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                                 sqlValue = rs.getString(3);
                                 sqlValueType = rs.getByte(4);
                             } catch (SQLException e) {
-                                throw ScriptException.toScriptException(e, query);
+                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
                             }
 
                             return new Entry<ScriptValue<K>, ScriptValue<V>>() {
@@ -410,7 +408,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                 }
             };
         } catch (SQLException e) {
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -443,17 +441,6 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
         }
         clone.putAll(this); // element are cloned since the come from a string in SQL
         return clone;
-
-        /*
-        try {
-            ScriptValueMap<K, V> clone = (ScriptValueMap<K, V>) super.clone();
-            clone.useSQLIfPossible = false;
-            return clone;
-        } catch (CloneNotSupportedException e) {
-            throw ScriptException.toScriptException(e);
-        }
-
-         */
     }
 
     @Override
@@ -477,7 +464,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             hashMap = copy;
             stringID = StringIDBeforeTry;
             SQLTable = null;
-            throw ScriptException.toScriptException(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
         }
     }
 
@@ -491,9 +478,10 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
     }
 
     /**
-     * Contrary of {@link ScriptValueMap#toNormalClasses()}</br>
+     * Contrary of {@link ScriptValueMap#toNormalClasses()}
      * This uses {@code <K, V>} because a {@link ScriptValueMap}{@code <K, V>} extends {@link Map}{@code <K, V>}.
      * @param keysAreJson whether the keys of hashMaps should be a json of the real key, because in json, every key is a string.
+     *
      */
     public static <K, V> ScriptValueMap<? extends K, ? extends V> toScriptValues(Map<K, V> map, boolean keysAreJson) {
         ScriptValueMap<K, V> finalMap = new ScriptValueMap<>();
@@ -517,7 +505,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                                 true);
                         break;
                     case '!':
-                        key = new ScriptValue<>(null);
+                        key = (ScriptValue<K>) ScriptValue.NONE;
                         break;
                     default:
                         throw new IllegalStateException("Invalid json type identifier, it should be '-', '_', '/' or '!' but it is "
@@ -532,7 +520,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
     }
 
     /**
-     * Contrary of {@link ScriptValueMap#toScriptValues(Map, boolean)}.<br/>
+     * Contrary of {@link ScriptValueMap#toScriptValues(Map, boolean)}.
      * Class type are {@code <Object, Object>} because for example, the normal class of
      * {@link ScriptValueMap} is {@link HashMap}
      * @param forJson if true, it will return {@code '/' + }{@link Gson#toJson(Object)} for keys that are not collections
@@ -613,6 +601,6 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
      * @return {@code object.type.equals("None") ? "IS" : "="}
      */
     public static String getSQLEqualsSign(ScriptValue<?> object) {
-        return object.is(ScriptValue.SVType.NONE) || (object.is(ScriptValue.SVType.BOOLEAN) && ! object.asBoolean()) ? "IS" : "=";
+        return object.is(ScriptValue.ScriptValueType.NONE) || (object.is(ScriptValue.ScriptValueType.BOOLEAN) && ! object.asBoolean()) ? "IS" : "=";
     }
 }

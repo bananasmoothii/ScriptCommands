@@ -17,37 +17,41 @@
 package fr.bananasmoothii.scriptcommands.bukkit;
 
 
+import fr.bananasmoothii.scriptcommands.Util;
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
 import fr.bananasmoothii.scriptcommands.core.execution.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.NONE;
+
 @SuppressWarnings("unused")
 public class BukkitUsableFunctions {
-    private static final ScriptValue<NoneType> NONE = new ScriptValue<>(null);
 
     private static void runSync(Runnable runnable) {
         Bukkit.getScheduler().runTask(ScriptCommands.inst(), runnable);
     }
 
-    private static List<@Nullable Player> getPlayersFromList(ScriptValue<Object> arg) {
+    private static List<@Nullable Player> getPlayersFromList(ScriptValue<?> arg, @NotNull Context context) {
         List<Player> players = new ArrayList<>();
         Server server = Bukkit.getServer();
-        if (arg.is(ScriptValue.SVType.TEXT)) {
+        if (arg.is(ScriptValue.ScriptValueType.TEXT)) {
             players.add(server.getPlayer(arg.asString()));
             return players;
-        } else if (arg.is(ScriptValue.SVType.LIST)) {
+        } else if (arg.is(ScriptValue.ScriptValueType.LIST)) {
             for (ScriptValue<Object> arg1 : arg.asList()) {
                 players.add(server.getPlayer(arg1.asString()));
             }
             return players;
         }
-        throw new ScriptException(ScriptException.ExceptionType.INVALID_TYPE, "[getting player]", arg.toString(), "passed argument is not a list or a text containing a player name.");
+        throw new ScriptException(ScriptException.ExceptionType.INVALID_TYPE, context, "Passed argument is not a list or a text containing a player name. It is: " +
+                Types.getPrettyArgAndType(arg));
     }
 
     @ScriptFunctionMethod
@@ -61,10 +65,17 @@ public class BukkitUsableFunctions {
             .setNamingPattern("cmd", "player");
     @ScriptFunctionMethod
     public static ScriptValue<NoneType> player_cmd(Args args) {
-        ScriptValue<Object> playersArg = args.getArgIfExist("player");
         String cmd = args.getArg("cmd").asString();
-        List<@Nullable Player> players = getP
-        CustomLogger.finer("making player " + String.join(", ", players) + " run " + cmd);
+
+        ScriptValue<Object> playersArg = args.getArgIfExist("player");
+        if (playersArg == null) playersArg = new ScriptValue<>(args.context.getTriggeringPlayer());
+        List<@Nullable Player> players = getPlayersFromList(playersArg, args.context);
+
+        CustomLogger.finer("making player " + Util.join(", ", players) + " run " + cmd);
+        for (@Nullable Player player : players) {
+            if (player != null)
+                player.performCommand(cmd);
+        }
         return NONE;
     }
 
@@ -73,19 +84,17 @@ public class BukkitUsableFunctions {
             .setNamingPattern("msg", "player");
     @ScriptFunctionMethod
     public static ScriptValue<NoneType> player_msg(Args args) {
-        ScriptValue<Object> players = args.getArgIfExist("player");
         String msg = args.getArg("msg").asString();
 
-        ArrayList<String> playersInArg = new ArrayList<>();
-        if (players == null) {
-            playersInArg.add(args.context.normalVariables.get("player").asString());
+        ScriptValue<Object> playersArg = args.getArgIfExist("player");
+        if (playersArg == null) playersArg = new ScriptValue<>(args.context.getTriggeringPlayer());
+        List<@Nullable Player> players = getPlayersFromList(playersArg, args.context);
+
+        CustomLogger.finer("making player " + Util.join(", ", players) + " run " + msg);
+        for (@Nullable Player player : players) {
+            if (player != null)
+                player.performCommand(msg);
         }
-        else {
-            for (ScriptValue<?> player: players.asList()) {
-                playersInArg.add(player.asString());
-            }
-        }
-        CustomLogger.finer("player " + String.join(", ", playersInArg) + " was sent a message: " + msg);
         return NONE;
     }
 

@@ -21,7 +21,6 @@ import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValue
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.Map.Entry;
 
 /**
@@ -72,11 +71,11 @@ public class Types {
 	 */
 	public static String getPrettyArg(ScriptValue<?> arg) {
 		switch (arg.type) {
-			case "Text":
+			case TEXT:
 				return "\"" + arg.asString().replace("\"", "\"\"") + "\"";
-			case "List":
+			case LIST:
 				return "[" + getPrettyArgs(arg.asList()) + "]";
-			case "Dictionary":
+			case DICTIONARY:
 				if (arg.asMap().size() != 0) {
 					ArrayList<String> keyValues = new ArrayList<>();
 					for (Object entryObj : arg.asMap().entrySet()) {
@@ -99,9 +98,22 @@ public class Types {
 	public static String getPrettyTypes(ScriptValueList<?> got) {
 		ArrayList<String> types = new ArrayList<>();
 		for (ScriptValue<?> value: got) {
-			types.add(value.type);
+			types.add(value.type.name);
 		}
 		return String.join(", ", types);
+	}
+
+	public static String getPrettyArgAndType(ScriptValue<?> arg) {
+		return getPrettyArg(arg) + '<' + arg.type.name + '>';
+	}
+
+	public static String getPrettyArgAndType(ScriptValueList<?> args) {
+		StringBuilder sb = new StringBuilder(args.size() * 10);
+		for (ScriptValue<?> arg : args) {
+			sb.append(getPrettyArgAndType(arg)).append(", ");
+		}
+		sb.setLength(sb.length() - 2);
+		return sb.toString();
 	}
 	
 }

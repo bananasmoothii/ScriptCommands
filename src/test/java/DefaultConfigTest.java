@@ -26,6 +26,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
+import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.NONE;
+
 public class DefaultConfigTest {
 
     @Test
@@ -44,7 +46,6 @@ public class DefaultConfigTest {
     }
 
     static class DummyBukkitUsableFunctions {
-        private static ScriptValue<NoneType> NONE = new ScriptValue<>(null);
 
         @ScriptFunctionMethod
         public static ScriptValue<NoneType> console_cmd(Args args) {

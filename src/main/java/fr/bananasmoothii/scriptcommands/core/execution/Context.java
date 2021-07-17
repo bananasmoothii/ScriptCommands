@@ -18,21 +18,26 @@ package fr.bananasmoothii.scriptcommands.core.execution;
 
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
 import fr.bananasmoothii.scriptcommands.core.antlr4parsing.ScriptsParser;
-import fr.bananasmoothii.scriptcommands.core.configsAndStorage.*;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.Config;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ContainingScripts.Type;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
+import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ContextStackTraceElement;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType;
+import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ScriptStackTraceElement;
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.misc.Pair;
+import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Objects;
+import java.lang.reflect.Modifier;
+import java.util.*;
 
 /**
- * Used for Scripts
+ * Used for Scripts. This is not thread-safe.
  */
 @SuppressWarnings("unchecked")
 public class Context implements Cloneable {
@@ -41,6 +46,17 @@ public class Context implements Cloneable {
 	// these are not final to allow lots of modulations, please don't mess with that XD
 	public StringScriptValueMap<Object> normalVariables = new StringScriptValueMap<>();
 	public static StringScriptValueMap<Object> globalVariables = StringScriptValueMap.getTheGlobal();
+	/** the player that triggered this command or event */
+	public final @Nullable Player triggeringPlayer;
+
+	protected @Nullable Context parent;
+	/**
+	 * The last call to {@link #callAndRun(String, Args, int, int)} or any similar overloaded method. If this is not null,
+	 * it means there is a call to {@link #callAndRun(String, Args, int, int)} running.
+	 */
+	private @Nullable ScriptStackTraceElement lastCall;
+	public final @Nullable String scriptName;
+	public final @Nullable Type scriptType;
 
 	protected static HashMap<String, Pair<ScriptFunction, Args.NamingPattern>> scriptFunctions = new HashMap<>();
 	protected static HashMap<String, Pair<ScriptIterator, Args.NamingPattern>> scriptIterators = new HashMap<>();
@@ -50,16 +66,48 @@ public class Context implements Cloneable {
 		registerMethodsFromClass(BaseUsableIterators.class);
 	}
 
-	/**
-	 * @param baseVariables variables that will be given to the script, null for no other variable
+	/**  
+	 * @param scriptName the name of the script, e.g. "server_start"
+	 * @param scriptType the type of the script 
 	 */
-	public Context(@Nullable StringScriptValueMap<Object> baseVariables) {
-		if (baseVariables != null)
-			normalVariables.putAll(baseVariables);
+	public Context(@Nullable String scriptName, @Nullable Type scriptType) {
+		this(scriptName, scriptType, null);
 	}
 
-	public Context() {
-		this(null);
+	/**
+	 * @param scriptName the name of the script, e.g. "server_start"
+	 * @param scriptType the type of the script
+	 * @param parent if this context was created from the call of a function in the script (the stack trace is deeper)
+	 */
+	public Context(@Nullable String scriptName, @Nullable Type scriptType, @Nullable Context parent) {
+		this(scriptName, scriptType, null, null, parent);
+	}
+
+	/**
+	 * @param scriptName the name of the script, e.g. "server_start"
+	 * @param scriptType the type of the script
+	 * @param baseVariables variables that will be given to the script, null for no other variable
+	 */
+	public Context(@Nullable String scriptName, @Nullable Type scriptType, @Nullable StringScriptValueMap<Object> baseVariables,
+				   @Nullable Player triggeringPlayer) {
+		this(scriptName, scriptType, baseVariables, triggeringPlayer, null);
+	}
+
+	/**
+	 * @param scriptName the name of the script, e.g. "server_start"
+	 * @param scriptType the type of the script
+	 * @param baseVariables variables that will be given to the script, null for no other variable
+	 * @param triggeringPlayer the player that triggered this command or event
+	 * @param parent if this context was created from the call of a function in the script (the stack trace is deeper)
+	 */
+	public Context(@Nullable String scriptName, @Nullable Type scriptType, @Nullable StringScriptValueMap<Object> baseVariables,
+				   @Nullable Player triggeringPlayer, @Nullable Context parent) {
+		this.scriptName = scriptName;
+		this.scriptType = scriptType;
+		if (baseVariables != null)
+			normalVariables.putAll(baseVariables);
+		this.triggeringPlayer = triggeringPlayer;
+		this.parent = parent;
 	}
 
 	public static void registerMethodsFromClass(Class<?> cls) {
@@ -81,11 +129,18 @@ public class Context implements Cloneable {
 
 			String variable = method.getName();
 
+
+			if (! Modifier.isStatic(method.getModifiers()))
+				throw new NullPointerException("The method " + variable + " in " + cls +
+						" is annotated as @ScriptFunctionMethod or @ScriptIteratorMethod, but it is not static.");
+
 			@Nullable Args.NamingPattern namingPattern = null;
 			try {
 				Field namingPatternProvider = cls.getField(variable);
 				if (namingPatternProvider.isAnnotationPresent(NamingPatternProvider.class)
 						&& namingPatternProvider.getType().equals(Args.NamingPattern.class)) {
+					if (! Modifier.isStatic(namingPatternProvider.getModifiers()))
+						throw new NullPointerException("The field " + variable + " in " + cls + " is annotated as @NamingPatternProvider, but it is not static.");
 					namingPattern = (Args.NamingPattern) namingPatternProvider.get(null);
 				}
 			} catch (NoSuchFieldException ignore) { }
@@ -99,15 +154,15 @@ public class Context implements Cloneable {
 						return (ScriptValue<Object>) method.invoke(null, args);
 
 					} catch (IllegalAccessException e) {
-						throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, variable, args,
+						throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, args.context,
 								"Access to function \"" + variable + "\" was refused");
 					} catch (InvocationTargetException e) {
 						Throwable targetException = e.getTargetException();
 						if (targetException instanceof ScriptException) {
 							throw (ScriptException) targetException;
 						} else {
-							throw (ScriptException) new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, variable, args,
-									"other error:\n" + targetException.getClass().getName() + ": " + targetException.getMessage())
+							throw (ScriptException) new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, args.context,
+									"Other error:\n" + targetException.getClass().getName() + ": " + targetException.getMessage())
 									.initCause(targetException);
 						}
 					}
@@ -118,15 +173,15 @@ public class Context implements Cloneable {
 						return (Iterator<ScriptValue<?>>) method.invoke(null, args);
 
 					} catch (IllegalAccessException e) {
-						throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, variable, args,
+						throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, args.context,
 								"Access to function \"" + variable + "\" was refused");
 					} catch (InvocationTargetException e) {
 						Throwable targetException = e.getTargetException();
 						if (targetException instanceof ScriptException) {
 							throw (ScriptException) targetException;
 						} else {
-							throw (ScriptException) new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, variable, args,
-									"other error:\n" + targetException.getClass().getName() + ": " + targetException.getMessage())
+							throw (ScriptException) new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, args.context,
+									"Other error:\n" + targetException.getClass().getName() + ": " + targetException.getMessage())
 									.initCause(targetException);
 						}
 					}
@@ -143,41 +198,58 @@ public class Context implements Cloneable {
 		scriptIterators.put(funcName, new Pair<>(scriptIterator, namingPattern));
 	}
 
-	public ScriptValue<?> callAndRun(String variable)  {
-		return this.callAndRun(variable, new Args(this));
+	public ScriptValue<?> callAndRun(String variable) {
+		return callAndRun(variable, 0, 0);
+	}
+
+	public ScriptValue<?> callAndRun(String variable, int lineNumber, int columnNumber)  {
+		return this.callAndRun(variable, new Args(this), lineNumber, columnNumber);
 	}
 
 	public ScriptValue<?> callAndRun(String variable, Args args) {
-		ScriptValue<?> value;
+		return callAndRun(variable, args, 0, 0);
+	}
 
-		ScriptsParser.StartContext funcStartContext;
+	public ScriptValue<?> callAndRun(String variable, Args args, int lineNumber, int columnNumber) {
+		lastCall = new ContextStackTraceElement(this, variable, args,
+				lineNumber, columnNumber);
 		try {
-			//noinspection ConstantConditions // for Intllij Idea saying the statement below could create a NullPointerException, but we are catching it anyway
-			funcStartContext = Config.getCorrespondingContainingScripts(ContainingScripts.Type.FUNCTION, variable).parseTree;
-			ScriptsExecutor visitor = new ScriptsExecutor(new Context(null)); // baseVariables are not copied over.
-			visitor.visit(funcStartContext);
-			return visitor.getReturned();
-		}
-		catch (NullPointerException ignored) { }
+			ScriptValue<?> value;
 
-		if (scriptFunctions.containsKey(variable)) {
-			Pair<ScriptFunction, Args.NamingPattern> pair = scriptFunctions.get(variable);
-			return pair.a.run(args.setNamingPattern(pair.b));
-		}
+			ScriptsParser.StartContext funcStartContext;
+			try {
+				//noinspection ConstantConditions // for Intllij Idea saying the statement below could create a NullPointerException, but we are catching it anyway
+				funcStartContext = Config.getCorrespondingContainingScripts(Type.FUNCTION, variable).parseTree;
+				ScriptsExecutor visitor = new ScriptsExecutor(new Context(variable, Type.FUNCTION, this)); // baseVariables are not copied over.
+				visitor.visit(funcStartContext);
+				return visitor.getReturned();
+			} catch (NullPointerException ignored) {
+			}
 
-		value = normalVariables.get(variable);
-		if (value != null) {
-			ScriptException.shouldHaveNoArgs(variable, args);
-			return value;
-		}
+			if (scriptFunctions.containsKey(variable)) {
+				Pair<ScriptFunction, Args.NamingPattern> pair = scriptFunctions.get(variable);
+				return pair.a.run(args.setNamingPattern(pair.b));
+			}
 
-		value = globalVariables.get(variable);
-		if (value != null) {
-			ScriptException.shouldHaveNoArgs(variable, args);
-			return value;
-		}
+			value = normalVariables.get(variable);
+			if (value != null) {
+				ScriptException.shouldHaveNoArgs(new ContextStackTraceElement(this,
+						variable, args, lineNumber, columnNumber));
+				return value;
+			}
 
-		throw new ScriptException(ExceptionType.NOT_DEFINED, variable, args, '\"' + variable + "\" does not exist.");
+			value = globalVariables.get(variable);
+			if (value != null) {
+				ScriptException.shouldHaveNoArgs(new ContextStackTraceElement(this,
+						variable, args, lineNumber, columnNumber));
+				return value;
+			}
+
+			throw new ScriptException(ExceptionType.NOT_DEFINED, this, '\"' + variable + "\" does not exist.\"");
+		}
+		finally {
+			lastCall = null;
+		}
 	}
 
 	public static @Nullable Iterator<ScriptValue<?>> getIterator(String name, Args args) {
@@ -188,42 +260,51 @@ public class Context implements Cloneable {
 		return null;
 	}
 	 
-	public void assign(String key, ScriptValue<?> value, boolean global) {
-		if (scriptFunctions.containsKey(key) || (global && normalVariables.containsKey(key))) {
-			throw new ScriptException(ExceptionType.NOT_OVERRIDABLE, "<assignment to " + key + '>', "",
-					"you tried to create/modify \"" + key + "\", but it is already a default function, or not a global" +
-							" variable and you tried to make it global, that cannot be overridden.");
-		}
-		if (global || globalVariables.containsKey(key)) {
+	public void assign(String key, ScriptValue<?> value, boolean global, Token startToken) {
+		assign(key, value, global, startToken.getLine(), startToken.getCharPositionInLine());
+	}
+
+	public void assign(String key, ScriptValue<?> value, boolean global, int lineNumber, int columnNumber) {
+		if (scriptFunctions.containsKey(key)) {
+			throw new ScriptException(ExceptionType.NOT_OVERRIDABLE,
+					"You tried to create/modify \"" + key + "\", but it is already a default function.",
+					new ContextStackTraceElement(this, "ASSIGNMENT TO " + key + " = " + value, lineNumber, columnNumber));
+		} if (global && normalVariables.containsKey(key)) {
+			throw new ScriptException(ExceptionType.NOT_OVERRIDABLE,
+					"You tried to create/modify \"" + key + "\", but that name is already taken by a global variable.",
+					new ContextStackTraceElement(this, "ASSIGNMENT TO " + key + " = " + value, lineNumber, columnNumber));
+		} if (global || globalVariables.containsKey(key)) {
 			globalVariables.put(key, (ScriptValue<Object>) value);
-		}
-		else {
+		} else {
 			normalVariables.put(key, (ScriptValue<Object>) value);
 		}
 	}
-	//public void assign(String key, Object value, boolean global) {this.assign(key, new ScriptValue(value), global);}
 
 	public void delete(String key) {
 		normalVariables.remove(key);
 		globalVariables.remove(key);
 	}
 
-	public static ScriptValue<?> trigger(ContainingScripts.Type scriptType, String scriptName, @Nullable StringScriptValueMap<Object> baseVariables) {
+	public static ScriptValue<?> trigger(Type scriptType, String scriptName, @Nullable StringScriptValueMap<Object> baseVariables, @Nullable Player triggeringPlayer) {
 		CustomLogger.finer("running " + scriptType.name() + " " + scriptName + "(" + Types.getPrettyArgs(null, baseVariables) + ")");
 		ScriptsParser.StartContext parseTree = Objects.requireNonNull(
 				Config.getCorrespondingContainingScripts(scriptType, scriptName), scriptName + " doesn't exist as " + scriptType.name())
 				.parseTree;
-		ScriptsExecutor visitor = new ScriptsExecutor(new Context(baseVariables));
+		ScriptsExecutor visitor = new ScriptsExecutor(new Context(scriptName, scriptType, baseVariables, triggeringPlayer));
 		visitor.visit(parseTree);
 		return visitor.getReturned();
 	}
 
-	public static ScriptThread threadTrigger(ContainingScripts.Type scriptType, String scriptName, @Nullable StringScriptValueMap<Object> baseVariables) {
+	public static ScriptThread threadTrigger(Type scriptType, String scriptName, @Nullable StringScriptValueMap<Object> baseVariables) {
+		return threadTrigger(scriptType, scriptName, baseVariables, null);
+	}
+
+	public static ScriptThread threadTrigger(Type scriptType, String scriptName, @Nullable StringScriptValueMap<Object> baseVariables, @Nullable Player triggeringPlayer) {
 		CustomLogger.finer("running " + scriptType.name() + " " + scriptName + "(" + Types.getPrettyArgs(null, baseVariables) + ") ASYNCHRONOUSLY");
 		ScriptsParser.StartContext parseTree = Objects.requireNonNull(
 				Config.getCorrespondingContainingScripts(scriptType, scriptName), scriptName + " doesn't exist as " + scriptType.name())
 				.parseTree;
-		ScriptThread scriptThread = new ScriptThread(new Context(baseVariables), parseTree);
+		ScriptThread scriptThread = new ScriptThread(new Context(scriptName, scriptType, baseVariables, triggeringPlayer), parseTree);
 		scriptThread.start();
 		return scriptThread;
 	}
@@ -233,7 +314,43 @@ public class Context implements Cloneable {
 		try {
 			return (Context) super.clone(); // it should work, even with the volatile variables in the UsableFunction
 		} catch (CloneNotSupportedException e) {
-			throw ScriptException.toScriptException(e);
+			throw ScriptException.wrapInShouldNotHappen(e, this);
 		}
+	}
+
+	public @Nullable Context getParent() {
+		return parent;
+	}
+
+	public void setParent(@Nullable Context parent) {
+		this.parent = parent;
+	}
+
+	/**
+	 * @param currentLevel you can specify the last thing called that caused the error here, but
+	 * @return the call hierarchy that led to the creation of this {@link Context}, where the first element is
+	 * "currentLevel" if not null else {@link #lastCall}.
+	 */
+	public ScriptStackTraceElement[] getStackTrace(@Nullable ScriptStackTraceElement currentLevel) {
+		ArrayList<ScriptStackTraceElement> stack = new ArrayList<>();
+		if (currentLevel != null) stack.add(currentLevel);
+		else if (lastCall != null) stack.add(lastCall);
+		else stack.add(ScriptStackTraceElement.UNKNOWN);
+		Context ctx = this;
+		for (;;) {
+			if (ctx.parent != null) stack.add(ctx.parent.lastCall != null ? ctx.parent.lastCall : ScriptStackTraceElement.UNKNOWN);
+			else break;
+		}
+		return stack.toArray(new ScriptStackTraceElement[0]);
+	}
+
+	/**
+	 * @return the player that triggered this command or event
+	 * @throws ScriptException if {@link #triggeringPlayer} is null
+	 */
+	public @NotNull Player getTriggeringPlayer() {
+		if (triggeringPlayer != null) return triggeringPlayer;
+		throw new ScriptException(ExceptionType.INVALID_ARGUMENTS, this, "You didn't provide any player to the function, " +
+				"and the function was executed in such a context that there is no player to execute the function with.");
 	}
 }

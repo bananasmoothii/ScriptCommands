@@ -34,6 +34,7 @@ public class ScriptThread extends Thread {
     public ScriptThread(@NotNull Context context, @NotNull ParserRuleContext ctxToExecute) {
         super();
         this.context = context.clone(); // if it wouldn't be cloned, it would force the user to make separate variables if two thread are doing the same thing...
+        this.context.setParent(context);
         this.ctxToExecute = ctxToExecute;
         id = new ScriptValue<>(super.getName());
         threads.put(id, this);
@@ -42,6 +43,7 @@ public class ScriptThread extends Thread {
     public ScriptThread(@NotNull Context context, @NotNull ParserRuleContext ctxToExecute, @Nullable ScriptValue<?> id) throws InvalidNameException {
         super(verifyNameAvailability(getValidID(id)).toString());
         this.context = context.clone(); // if it wouldn't be cloned, it would force the user to make separate variables if two thread are doing the same thing...
+        this.context.setParent(context);
         this.ctxToExecute = ctxToExecute;
         this.id = id;
         threads.put(id, this);
@@ -54,7 +56,7 @@ public class ScriptThread extends Thread {
     }
 
     public static boolean isAvailableName(ScriptValue<?> id) {
-        return ! threads.containsKey(new ScriptValue<>(id));
+        return ! threads.containsKey(id);
     }
 
     private static @NotNull ScriptValue<?> getValidID(@Nullable ScriptValue<?> id) {

@@ -78,7 +78,7 @@ try_block
 	;
 
 catch_block
-    : CATCH (varToAssign += VARIABLE ASSIGNMENT)? expression (COMMA expression)* block
+    : CATCH (varToAssign = VARIABLE ASSIGNMENT)? expression (COMMA expression)* block
     ;
 
 switch_block
@@ -147,10 +147,10 @@ function
 	;
 
 arguments
-	: OPEN_PAR ( (expression | simpleAssignment | splatList | splatDict)
-	             (COMMA (expression | simpleAssignment | splatList | splatDict))*
-	           )?
-	  CLOSE_PAR
+	: OPEN_PAR
+	( (expression | simpleAssignment | splatList | splatDict)
+	  (COMMA (expression | simpleAssignment | splatList | splatDict))*
+	)? CLOSE_PAR
 	;
 
 list
@@ -198,8 +198,10 @@ comparison
 	;
 
 comp_molecule
-	: comp_atom ( operator += (EQUALS | NOT_EQUALS | GREATER | LESSER | GREATER_OR_EQUALS | LESSER_OR_EQUALS | IN) comp_atom )*
-	;
+	: comp_atom
+	( ( operator += (EQUALS | NOT_EQUALS | GREATER | LESSER | GREATER_OR_EQUALS | LESSER_OR_EQUALS) comp_atom )*
+	| operator += IN comp_atom
+	);
 
 comp_atom
 	: NOT ?
@@ -207,8 +209,7 @@ comp_atom
 	| OPEN_PAR expression CLOSE_PAR
 	| maths
 	| log
-	)
-	;
+	);
 
 maths
 	: multiplication (operator += (PLUS | MINUS) multiplication)*
@@ -230,7 +231,7 @@ maths_atom
 	;
 
 mini_if
-	: comparison // could be just expression but an expression will be used almost everytime so this will make less deeper parse trees.
+	: comparison // could be just expression but an expression will be used almost everytime so this will make less deeper parse trees, plus a comparison can contain only an expression
 	  QUESTION_MARK yes = expression ELSE no = expression
 	;
 
