@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package fr.bananasmoothii.scriptcommands;
+package fr.bananasmoothii.scriptcommands.core;
 
 public abstract class Util {
 

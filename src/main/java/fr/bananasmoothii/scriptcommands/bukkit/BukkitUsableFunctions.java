@@ -17,7 +17,7 @@
 package fr.bananasmoothii.scriptcommands.bukkit;
 
 
-import fr.bananasmoothii.scriptcommands.Util;
+import fr.bananasmoothii.scriptcommands.core.Util;
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
 import fr.bananasmoothii.scriptcommands.core.execution.*;
 import org.bukkit.Bukkit;

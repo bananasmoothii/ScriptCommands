@@ -71,15 +71,14 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	}
 	
 	/**
-	 * Start for parsing. It catches any {@link ScriptException} and prints them.
+	 * Start for parsing. It catches any {@link RuntimeException} and prints them.
 	 */
 	@Override
 	public ScriptValue<NoneType> visitStart(ScriptsParser.StartContext ctx) {
 		try {
 			super.visitStart(ctx);
-		} catch (ScriptException e) {
+		} catch (RuntimeException e) {
 			e.printStackTrace();
-
 		}
 		return NONE;
 	}
@@ -159,7 +158,9 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	public ScriptValue<NoneType> visitTry_block(ScriptsParser.Try_blockContext ctx) {
 		try {
 			visit(ctx.block());
-		} catch (ScriptException e) {
+		} catch (RuntimeException e) {
+			if (e instanceof ScriptException.Incomplete) e = ((ScriptException.Incomplete) e).complete(context);
+			if (! (e instanceof ScriptException)) e = ScriptException.wrapInShouldNotHappen(e, context);
 			for (ScriptsParser.Catch_blockContext catchCtx: ctx.catch_block()) {
 				for (ScriptsParser.ExpressionContext expression : catchCtx.expression()) {
 					ScriptValue<?> expr = visitExpression(expression);
@@ -167,7 +168,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 						throw ScriptException.invalidType("Text or Boolean", expr,
 								new ContextStackTraceElement(context,"try {...} catch", ctx.start));
 					}
-					if ((expr.is(ScriptValueType.TEXT) && expr.asString().equals(e.stringType))
+					if (expr.is(ScriptValueType.TEXT) && expr.asString().equals(((ScriptException) e).getStringType())
 							|| (expr.is(ScriptValueType.BOOLEAN) && expr.asBoolean())) {
 						if (catchCtx.varToAssign != null)
 							context.assign(catchCtx.varToAssign.getText(), expr, false, catchCtx.start.getLine(), catchCtx.start.getCharPositionInLine());

@@ -16,6 +16,9 @@
 
 package fr.bananasmoothii.scriptcommands.core.configsAndStorage;
 
+import fr.bananasmoothii.scriptcommands.core.contextReplacement.AbstractScriptValueList;
+import fr.bananasmoothii.scriptcommands.core.contextReplacement.UseContext;
+import fr.bananasmoothii.scriptcommands.core.execution.Context;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptException;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
 import fr.bananasmoothii.scriptcommands.core.execution.Types;
@@ -28,11 +31,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
-/**
- * @param <E> the type of each {@link ScriptValue}
- */
+// TODO: wrap all possible exceptions
+// TODO: remove all usages where possible of methods annotated @UseContext
+
 @SuppressWarnings({"unchecked"})
-public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements ScriptValueCollection, Iterable<ScriptValue<E>> {
+public class ScriptValueList<E> extends AbstractScriptValueList<E> {
 
     /** with prefix, null if isSQL is false. */
     private @Nullable String SQLTable;
@@ -125,7 +128,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
     private int lastSize = -1;
 
     @Override
-    public int size() {
+    public int size(@Nullable Context context) {
         if (arrayList != null) return arrayList.size();
         if (lastSize != -1 && timesModifiedSinceLastSave == 0) return lastSize;
         String query = "SELECT COUNT(*) FROM `" + SQLTable + '`';
@@ -135,12 +138,12 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             lastSize = rs.getInt(1);
             return lastSize;
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
     @Override
-    public boolean add(ScriptValue<E> element) {
+    public boolean add(ScriptValue<E> element, @Nullable Context context) {
         if (arrayList != null) {
             boolean returned = arrayList.add(element);
             if (returned) modified();
@@ -156,18 +159,18 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             modified();
             return true;
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
     @Override
-    public void add(int index, ScriptValue<E> element) {
+    public void add(int index, ScriptValue<E> element, @Nullable Context context) {
+        rangeCheckForAdd(index, context);
         if (arrayList != null) {
             arrayList.add(index, element);
             modified();
             return;
         }
-        rangeCheck(index);
         String query = "UPDATE `" + SQLTable + "` SET `index` = `index` + 1 WHERE `index` >= " + index;
         try {
             Storage.executeSQLUpdate(query);
@@ -183,19 +186,19 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             ps.executeUpdate();
             modified();
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
     @Override
-    public ScriptValue<E> set(int index, ScriptValue<E> element) {
+    public ScriptValue<E> set(int index, ScriptValue<E> element, @Nullable Context context) {
+        rangeCheck(index, context);
         if (arrayList != null) {
             ScriptValue<E> ret = arrayList.set(index, element);
             modified();
             return ret;
         }
         ScriptValue<E> previousElement = get(index);
-        rangeCheck(index);
         String query = "UPDATE `" + SQLTable + "` SET `object` = ?, `type` = ? WHERE `index` = ?";
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
@@ -205,21 +208,9 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             query += " => " + ps;
             modified();
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
         return previousElement;
-    }
-
-    /**
-     * Checks if the given index is in range.  If not, throws an appropriate
-     * runtime exception.  This method does *not* check if the index is
-     * negative: It is always used immediately prior to an array access,
-     * which throws an ArrayIndexOutOfBoundsException if index is negative.
-     * @see ArrayList#remove(int)
-     */
-    private void rangeCheck(int index) {
-        if (index >= size())
-            throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + size());
     }
 
     /**
@@ -227,18 +218,18 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
      * a <code>{@link ScriptValue}<{@link fr.bananasmoothii.scriptcommands.core.execution.NoneType NoneType}></code>
      */
     @Override
-    public ScriptValue<E> get(int index) {
+    public ScriptValue<E> get(int index, @Nullable Context context) {
+        rangeCheck(index, context);
         if (arrayList != null) {
             return arrayList.get(index);
         }
-        rangeCheck(index);
         String query = "SELECT `object`, `type` FROM `" + SQLTable + "` WHERE `index` = " + index;
         try {
             ResultSet rs = Storage.executeSQLQuery(query);
             rs.next();
             return (ScriptValue<E>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2));
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
@@ -246,20 +237,20 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
      * Removes the element at the specified position in this list (optional
      * operation).  Shifts any subsequent elements to the left (subtracts one
      * from their indices).  Returns the element that was removed from the
-     * list.
+     * list. <br>
      * If this returns {@code null}, it means there was an error, because if this works, it should return
      * a <code>{@link ScriptValue}<{@link fr.bananasmoothii.scriptcommands.core.execution.NoneType NoneType}></code>
      * @param index the index of the element to be removed
      * @return the element previously at the specified position
      * @see ScriptValueList#get(int)
      */
-    public ScriptValue<E> remove(int index) {
+    public ScriptValue<E> remove(int index, @Nullable Context context) {
+        rangeCheck(index, context);
         if (arrayList != null) {
             ScriptValue<E> ret = arrayList.remove(index);
             modified();
             return ret;
         }
-        rangeCheck(index);
         ScriptValue<E> previous = get(index);
         String query = "DELETE FROM `" + SQLTable + "` WHERE `index` = " + index;
         try {
@@ -272,29 +263,80 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             Storage.executeSQLUpdate(query);
             modified();
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
         return previous;
     }
 
     @Override
-    public void clear() {
-        for (int i = size() - 1; i >= 0; i--) {
-            remove(i);
+    public boolean remove(Object o, @Nullable Context context) {
+        if (! (o instanceof ScriptValue)) return false;
+        if (arrayList != null) {
+            boolean ret = arrayList.remove(o);
+            modified();
+            return ret;
         }
-        modified();
+        int index = indexOf(o);
+        if (index == -1) return false;
+        remove(index, context);
+        return true;
     }
 
-    /**
-     * This is a bit different than {@link AbstractList#subList(int, int) the default subList} because here,
-     * it is already a {@link ScriptValueList}, and a {@link #clone()} equivalent was applied.
-     * @param fromIndex inclusive
-     * @param toIndex exclusive
-     */
     @Override
-    public @NotNull ScriptValueList<E> subList(int fromIndex, int toIndex) {
-        rangeCheck(fromIndex);
-        rangeCheck(toIndex - 1);
+    public int indexOf(Object o, @Nullable Context context) {
+        if (! (o instanceof ScriptValue)) return -1;
+        if (arrayList != null) {
+            return arrayList.indexOf(o);
+        }
+        return indexOf(o, "ASC", context);
+    }
+
+    @Override
+    public int lastIndexOf(Object o, @Nullable Context context) {
+        if (! (o instanceof ScriptValue)) return -1;
+        if (arrayList != null) {
+            return arrayList.lastIndexOf(o);
+        }
+        return indexOf(o, "DESC", context);
+    }
+
+    private int indexOf(Object o, String order, @Nullable Context context) {
+        ScriptValue<?> element = (ScriptValue<?>) o;
+        String query = "SELECT `index` FROM `" + SQLTable + "` WHERE `object` = ? AND `type` = ? ORDER BY `index` " + order + " LIMIT 1";
+        try {
+            PreparedStatement ps = Storage.prepareSQLStatement(query);
+            ScriptValueCollection.setScriptValueInPreparedStatement(ps, element, 1, 2);
+            query += " => " + ps;
+            ResultSet resultSet = ps.executeQuery();
+            if (! resultSet.next()) return -1;
+            return resultSet.getInt(1);
+        } catch (SQLException e) {
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
+        }
+    }
+
+    @Override
+    public void clear(@Nullable Context context) {
+        if (!isEmpty()) return;
+
+        if (arrayList != null) {
+             arrayList.clear();
+             modified();
+             return;
+        }
+        String query = "DELETE FROM `" + SQLTable + '`';
+        try {
+            Storage.executeSQLUpdate(query);
+            modified();
+        } catch (SQLException e) {
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
+        }
+    }
+
+    @Override
+    public @NotNull ScriptValueList<E> subList(int fromIndex, int toIndex, @Nullable Context context) {
+        rangeCheck(fromIndex, context);
+        rangeCheck(toIndex - 1, context);
         ScriptValueList<E> newList = new ScriptValueList<>();
         if (arrayList != null) {
             for (; fromIndex < toIndex; fromIndex++) {
@@ -309,53 +351,32 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
                 newList.add((ScriptValue<E>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2)));
             }
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
         return newList;
     }
 
+    @Override @UseContext
+    public ScriptValueList<E> subList(int fromIndex, int toIndex) {
+        return (ScriptValueList<E>) super.subList(fromIndex, toIndex);
+    }
+
     @Override
-    public boolean contains(Object o) {
+    public boolean contains(Object o, @Nullable Context context) {
         if (! (o instanceof ScriptValue)) return false;
         if (arrayList != null) return arrayList.contains(o);
-        String query = "SELECT `object`, `type` FROM `" + SQLTable + '`';
-        ScriptValue<?> o1 = (ScriptValue<?>) o;
+        String query = "SELECT * FROM `" + SQLTable + "` WHERE `object` = ? AND `type` = ? LIMIT 1";
         try {
-            ResultSet rs = Storage.executeSQLQuery(query);
-            while (rs.next()) {
-                byte type = rs.getByte(2);
-                if (type != o1.type.asByte) continue;
-                ScriptValue<?> objectTested = ScriptValueCollection.transformToScriptValue(rs.getString(1), type);
-                if (objectTested.equals(o1)) return true;
-            }
-            return false;
+            PreparedStatement ps = Storage.prepareSQLStatement(query);
+            ScriptValueCollection.setScriptValueInPreparedStatement(ps, (ScriptValue<?>) o, 1, 2);
+            query += " => " + ps;
+            ResultSet rs = ps.executeQuery();
+            return rs.next();
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
-    @Override
-    public @NotNull Iterator<ScriptValue<E>> iterator() {
-        return new Iterator<ScriptValue<E>>() {
-            private int currentIndex = 0;
-            private final int size = size();
-
-            @Override
-            public boolean hasNext() {
-                return currentIndex < size;
-            }
-
-            @Override
-            public ScriptValue<E> next() {
-                return get(currentIndex++);
-            }
-
-            @Override
-            public void remove() {
-                throw new UnsupportedOperationException("This iterator is read only");
-            }
-        };
-    }
 
     /**
      * Provides a copy of this ScriptValueList, but not using SQL and with no {@link Storage}.
@@ -377,7 +398,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
     }
 
     @Override
-    public boolean makeSQL() {
+    public boolean makeSQL(@Nullable Context context) {
         if (arrayList == null) return false;
         if (! Storage.isSQL)
             throw new NotUsingSQLException("the provided Storage class is not using SQL");
@@ -397,7 +418,7 @@ public class ScriptValueList<E> extends AbstractList<ScriptValue<E>> implements 
             arrayList = copy;
             stringID = StringIDBeforeTry;
             SQLTable = null;
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 

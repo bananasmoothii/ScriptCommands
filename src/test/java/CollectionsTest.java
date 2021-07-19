@@ -66,6 +66,7 @@ public class CollectionsTest {
         testList();
         testMap();
         contains();
+        indexOf();
         jsonSerialisationTest();
         globals();
         cloneTest();
@@ -137,6 +138,15 @@ public class CollectionsTest {
         CustomLogger.info(trueObj2 + " " + trueObj3 + " " + trueObj4 + " <== should all be true");
 
         assert trueObj1 && trueObj2 && trueObj3 && trueObj4 : "something bugged";
+    }
+
+    void indexOf() {
+        ScriptValueList<Integer> list = new ScriptValueList<>(true);
+        list.add(new ScriptValue<>(2));
+        list.add(new ScriptValue<>(3));
+        list.add(new ScriptValue<>(2));
+        assert list.indexOf(new ScriptValue<>(2)) == 0;
+        assert list.lastIndexOf(new ScriptValue<>(2)) == 2;
     }
 
     @SuppressWarnings("SuspiciousMethodCalls")

@@ -186,7 +186,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
     /**
      * If this returns {@code null}, it means there was an error or your key wasn't a {@link ScriptValue},
      * because if this works, it should return a
-     * <code>{@link ScriptValue}<{@link fr.bananasmoothii.scriptcommands.core.execution.NoneType NoneType}></code>
+     * <code>{@link ScriptValue}<{@link fr.bananasmoothii.scriptcommands.core.execution.NoneType NoneType}></code> <br>
      * @return the object if found, a {@link ScriptValue}<{@link fr.bananasmoothii.scriptcommands.core.execution.NoneType}>
      *     otherwise
      */
@@ -520,7 +520,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
     }
 
     /**
-     * Contrary of {@link ScriptValueMap#toScriptValues(Map, boolean)}.
+     * Contrary of {@link ScriptValueMap#toScriptValues(Map, boolean)}. <br>
      * Class type are {@code <Object, Object>} because for example, the normal class of
      * {@link ScriptValueMap} is {@link HashMap}
      * @param forJson if true, it will return {@code '/' + }{@link Gson#toJson(Object)} for keys that are not collections

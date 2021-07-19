@@ -33,7 +33,7 @@ import java.sql.SQLException;
 import java.util.*;
 
 /**
- * Similar to {@link ScriptValueMap} but for global variables, with names.
+ * Similar to {@link ScriptValueMap} but for global variables, with names. <br>
  * This can store values in normal SQL tables just like {@link ScriptValueMap} because the code was just copy/pasted,
  * but this would be no use...
  * @param <V> the type of {@link ScriptValue} this map will store as values

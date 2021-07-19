@@ -26,8 +26,8 @@ import java.sql.SQLException;
 public interface ScriptValueCollection extends Cloneable {
 
     /**
-     * to use {@link java.util.ArrayList} and {@link java.util.HashMap} again. <br/>
-     * For instance, a {@link ScriptValueList} of {@link ScriptValue} of String will be converted to an {@code ArrayList<String>}.
+     * to use {@link java.util.ArrayList} and {@link java.util.HashMap} again. <br>
+     * For instance, a {@link ScriptValueList} of {@link ScriptValue} of Strings will be converted to an {@code ArrayList<String>}.
      * @param forJson whether the keys of hashMaps should be a json of the real key, because in json, every key is a string.
      */
     Object toNormalClasses(boolean forJson);

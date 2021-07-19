@@ -28,7 +28,7 @@ import java.util.Objects;
  * The main exception used everywhere in scripts.
  * @see Incomplete if you don't have any Context to provide, or you don't know where the exception happened in the script
  */
-public class ScriptException extends RuntimeException {
+public class ScriptException extends AbstractScriptException {
 
     protected String stringType;
     protected @Nullable String genericErrorDescription;
@@ -36,7 +36,7 @@ public class ScriptException extends RuntimeException {
     protected ScriptStackTraceElement[] scriptStackTrace;
 
     public ScriptException(ExceptionType type, @NotNull Context context, String message) {
-        this(type.name, context, message, null);
+        this(type.name(), context, message, null);
         genericErrorDescription = type.description;
     }
 
@@ -45,7 +45,7 @@ public class ScriptException extends RuntimeException {
      *                             so {@link Context#callAndRun(String, Args, int, int)} was called
      */
     public ScriptException(ExceptionType type, @NotNull Context context, String message, @Nullable ScriptStackTraceElement where) {
-        this(type.name, context, message, where);
+        this(type.name(), context, message, where);
         genericErrorDescription = type.description;
     }
 
@@ -54,7 +54,7 @@ public class ScriptException extends RuntimeException {
      *                             so {@link Context#callAndRun(String, Args, int, int)} was called
      */
     public ScriptException(ExceptionType type, String message, @NotNull ContextStackTraceElement where) {
-        this(type.name, where.context, message, where);
+        this(type.name(), where.context, message, where);
         genericErrorDescription = type.description;
     }
 
@@ -101,21 +101,22 @@ public class ScriptException extends RuntimeException {
         return sb.toString();
     }
 
+    @Override
     public String getStringType() {
         return stringType;
     }
 
+    @Override
     public void setStringType(String stringType) {
-        this.stringType = stringType;
+        this.stringType = Objects.requireNonNull(stringType);
     }
 
+    @Override
     public @Nullable String getGenericErrorDescription() {
         return genericErrorDescription;
     }
 
-    /**
-     * @return {@code this}, for chained call, e.g. {@code throw new ScriptException(...).setGenericErrorDescription(...);}
-     */
+    @Override
     public @NotNull ScriptException setGenericErrorDescription(@Nullable String genericErrorDescription) {
         this.genericErrorDescription = genericErrorDescription;
         return this;
@@ -134,44 +135,39 @@ public class ScriptException extends RuntimeException {
     }
 
     public enum ExceptionType {
-        ASSERTION_ERROR("ASSERTION_ERROR",
-                "An assertion error happens when when using the \"assert\" keyword but the expression evaluates to false."),
-        CONVERSION_ERROR("CONVERSION_ERROR", "A conversion error happens when you want to convert a type " +
-                "to another. For example, you can convert \"12.8\" (a string) to 12.8 (a decimal number), and 12.8 to an " +
-                "integer (it will be rounded to 12), but you can't convert a list to a boolean or whatever the heck you " +
-                "are thinking about (just joking you're intelligent <3)."),
-        GLOBAL_NOT_ALLOWED("GLOBAL_NOT_ALLOWED", "Global not allowed means that you can't use the \"global\" keyword where you just used it."),
-        UNAVAILABLE_THREAD_NAME("UNAVAILABLE_THREAD_NAME", "Unavailable thread name means that you wanted to make a new thread with a name that already exists."),
-        INVALID_ARGUMENTS("INVALID_ARGUMENTS", "Invalid arguments happens when you don't give the right arguments to a function."),
-        INVALID_OPERATOR("INVALID_OPERATOR", "Invalid operator happens when the operator you are using " +
-                "doesn't work with the two values you put in, for example you can't subtract a list to a boolean (what would that mean ??)"),
-        INVALID_TYPE("INVALID_TYPE", "Invalid type happens when the type you are using doesn't work with " +
-                "the function you used it with. This happens very often in functions, but it can also show up in iterations " +
-                "(for i in ...), with the splat operator * not on a list or ** not on a dictionary, "),
-        NOT_DEFINED("NOT_DEFINED", "Not defined is an error happening when you are calling a variable or " +
-                "a function that is not defined, or you are calling an element in a dictionary that doesn't exist (e.g. [=][\"something\"] )."),
-        NOT_OVERRIDABLE("NOT_OVERRIDABLE", "Not overridable shows up when you try to create a variable but it already " +
-                "exists as function, or when you are creating a global variable but it already exists as non-global variable."),
-        NOT_LISTABLE("NOT_LISTABLE", "Not listable happens if you are using the 'in' keyword to check if an " +
-                "element is in a list/dictionary/text, but the last part is not a list (e.g. when you do something like if 10 in 12 {...}"),
-        OUT_OF_BOUNDS("OUT_OF_BOUNDS", "out of bounds just means you called an element in a list but your index " +
-                "was either negative or it was equal or above the number of elements in the list (remember that list indexes " +
-                "start at 0)."),
-        /** For errors that should not happen */
-        SHOULD_NOT_HAPPEN("SHOULD_NOT_HAPPEN", "Hey ! You got a Should Not Happen error ! As the name states it, " +
-                "this error should never happen and it is a bug. Please report it at https://github.com/bananasmoothii/ScriptCommands/issues .");
+        ASSERTION_ERROR("An assertion error happens when when using the \"assert\" keyword but the expression " +
+                "evaluates to false."),
+        CONVERSION_ERROR("A conversion error happens when you want to convert a type to another. For example, " +
+                "you can convert \"12.8\" (a string) to 12.8 (a decimal number), and 12.8 to an integer (it will be " +
+                "rounded to 12), but you can't convert a list to a boolean or whatever the heck you are thinking about " +
+                "(just joking you're intelligent <3)."),
+        GLOBAL_NOT_ALLOWED("Global not allowed means that you can't use the \"global\" keyword where you just used it."),
+        INVALID_ARGUMENTS("Invalid arguments happens when you don't give the right arguments to a function."),
+        INVALID_OPERATOR("Invalid operator happens when the operator you are using doesn't work with the two " +
+                "values you put in, for example you can't subtract a list to a boolean (what would that mean ??)"),
+        INVALID_TYPE("Invalid type happens when the type you are using doesn't work with the function you used " +
+                "it with. This happens very often in functions, but it can also show up in iterations (for i in ...), " +
+                "with the splat operator * not on a list or ** not on a dictionary, "),
+        NOT_DEFINED("Not defined is an error happening when you are calling a variable or a function that is " +
+                "not defined, or you are calling an element in a dictionary that doesn't exist (e.g. [=][\"something\"] )."),
+        NOT_LISTABLE("Not listable happens if you are using the 'in' keyword to check if an element is in a " +
+                "list/dictionary/text, but the last part is not a list (e.g. when you do something like if 10 in 12 {...}"),
+        NOT_OVERRIDABLE("Not overridable shows up when you try to create a variable but it already exists as " +
+                "function, or when you are creating a global variable but it already exists as non-global variable."),
+        OUT_OF_BOUNDS("out of bounds just means you called an element in a list but your index was equal or " +
+                "above the number of elements in the list (remember that list indexes start at 0), or the negative " +
+                "equivalent. For example, if you have the list [\"a\", \"b\", \"c\"], you can call elements 0 " +
+                "(-> \"a\"), 1 (-> \"b\"), 2 (-> \"c\"), or negative index -1 (-> \"c\"), -2 (-> \"b\"), -3 (-> \"a\"). " +
+                "For a list of 3 elements, these are the only 6 indexes that will not cause an OUT_OF_BOUNDS error."),
+        SHOULD_NOT_HAPPEN("Hey ! You got a Should Not Happen error ! As the name states it, this error should " +
+                "never happen and it is a bug. Please report it at https://github.com/bananasmoothii/ScriptCommands/issues ."),
+        UNAVAILABLE_THREAD_NAME("Unavailable thread name means that you wanted to make a new thread with a name " +
+                "that already exists.");
 
-        public final String name;
         public final String description;
 
-        ExceptionType(String name, String description) {
-            this.name = name;
+        ExceptionType(String description) {
             this.description = description;
-        }
-
-        @Override
-        public String toString() {
-            return name;
         }
     }
 
@@ -275,19 +271,19 @@ public class ScriptException extends RuntimeException {
      * don't know where the error happened in the script
      * @see ScriptException
      */
-    public static class Incomplete extends RuntimeException {
+    public static class Incomplete extends AbstractScriptException {
 
         protected String stringType;
         protected @Nullable String genericErrorDescription;
         protected @Nullable ScriptStackTraceElement where;
 
         public Incomplete(ExceptionType type, String message) {
-            this(type.name, message, null);
+            this(type.name(), message, null);
             genericErrorDescription = type.description;
         }
 
         public Incomplete(ExceptionType type, String message, @Nullable ScriptStackTraceElement where) {
-            this(type.name, message, where);
+            this(type.name(), message, where);
         }
 
         public Incomplete(String stringType, String message) {
@@ -300,17 +296,28 @@ public class ScriptException extends RuntimeException {
             this.where = where;
         }
 
+        @Override
         public String getStringType() {
             return stringType;
         }
 
+        @Override
+        public void setStringType(String stringType) {
+            this.stringType = Objects.requireNonNull(stringType);
+        }
+
+        @Override
         public @Nullable String getGenericErrorDescription() {
             return genericErrorDescription;
         }
 
-        public void setGenericErrorDescription(@Nullable String genericErrorDescription) {
+        @Override
+        public @NotNull Incomplete setGenericErrorDescription(@Nullable String genericErrorDescription) {
             this.genericErrorDescription = genericErrorDescription;
+            return this;
         }
+
+
 
         public ScriptException complete(@NotNull Context context) {
             return complete(context, where);
@@ -334,7 +341,7 @@ public class ScriptException extends RuntimeException {
          * If "context" is not null, it will return a completed {@link ScriptException} of this Incomplete ScriptException,
          * and if it is null, it will return this.
          */
-        public RuntimeException completeIfPossible(@Nullable Context context) {
+        public AbstractScriptException completeIfPossible(@Nullable Context context) {
             if (context != null) return complete(context, null);
             else return this;
         }
