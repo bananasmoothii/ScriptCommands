@@ -263,8 +263,8 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 				public ScriptValue<?> next() {
 					ScriptValueList<Object> pair = new ScriptValueList<>();
 					Entry<ScriptValue<Object>, ScriptValue<Object>> next = iterator.next();
-					pair.add(next.getKey());
-					pair.add(next.getValue());
+					pair.add(next.getKey(), context);
+					pair.add(next.getValue(), context);
 					return new ScriptValue<>(pair);
 				}
 			};

@@ -122,7 +122,9 @@ public class Args {
 
     public Args(@Nullable ScriptValueList<Object> argsList, @Nullable StringScriptValueMap<Object> argsMap, @NotNull Context context) {
         this.argsList = argsList == null ? new ScriptValueList<>() : argsList;
+        this.argsList.setFixedContext(context);
         this.argsMap = argsMap == null ? new StringScriptValueMap<>() : argsMap;
+        this.argsMap.setFixedContext(context);
         this.context = context;
     }
 
@@ -179,8 +181,8 @@ public class Args {
      * if there isn't one arg in total.
      */
     public @NotNull ScriptValue<Object> getSingleArg() {
-        if (argsList.size() == 1 && argsMap.size() == 0) return argsList.get(0);
-        if (argsMap.size() == 1 && argsList.size() == 0) return argsMap.values().get(0);
+        if (argsList.size() == 1 && argsMap.isEmpty()) return argsList.get(0);
+        if (argsMap.size() == 1 && argsList.isEmpty()) return argsMap.values().get(0);
         throw new ScriptException(INVALID_ARGUMENTS, context, "There should be only one argument to this function.");
     }
 

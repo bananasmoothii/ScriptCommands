@@ -25,8 +25,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * This annotations tells you that the method that you are about to use has an overload with a {@link Context}, and you
- * should use this one if you can grab a {@link Context} because it allows a better error handling.
+ * This annotation tells you that the method that you are about to use has an overload with a {@link Context}, and you
+ * should use this one if you can grab a {@link Context} because it allows a better error handling.<br>
+ * You can use a method annotated @UseContext with peace in mind if the class implements {@link ContextFixable} and you
+ * set a context using {@link ContextFixable#setFixedContext(Context)}.
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})

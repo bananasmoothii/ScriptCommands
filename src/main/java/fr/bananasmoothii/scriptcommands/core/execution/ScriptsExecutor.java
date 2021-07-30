@@ -344,13 +344,13 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 					if (global)
 						throw globalError;
 					if (a.is(ScriptValueType.LIST)) {
-						a.asList().add((ScriptValue<Object>) b);
+						a.asList().add((ScriptValue<Object>) b, context);
 						return NONE;
 					}
 					else if (a.is(ScriptValueType.DICTIONARY) && b.is(ScriptValueType.LIST)) {
-						if (b.asList().size() != 2)
+						if (b.asList().size(context) != 2)
 							throw error;
-						a.asMap().put(b.asList().get(0), b.asList().get(1));
+						a.asMap().put(b.asList().get(0, context), b.asList().get(1, context));
 						return NONE;
 					}
 					else
@@ -366,9 +366,9 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 						throw globalError;
 					if (a.is(ScriptValueType.LIST)) {
 						if (! b.is(ScriptValueType.INTEGER))
-							a.asList().remove(b);
+							a.asList().remove(b, context);
 						else
-							a.asList().remove(b.asInteger());
+							a.asList().remove(b.asInteger(), context);
 						return NONE;
 					}
 					else if (a.is(ScriptValueType.DICTIONARY)) {
@@ -433,11 +433,11 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		if (getFromListContext.nbSingle != null) {
 			if (obj.is(ScriptValueType.LIST)) {
 				int number = visitExpression(getFromListContext.nbSingle).asInteger();
-				int size = obj.asList().size();
+				int size = obj.asList().size(context);
 				if (number >= size || number <= -size)
 					throw getOutOfBoundsException(scriptCause, number, size, getFromListContext.start);
 				if (number < 0) number += size;
-				return obj.asList().get(number);
+				return obj.asList().get(number, context);
 			}
 			else if (obj.is(ScriptValueType.DICTIONARY)) {
 				ScriptValue<?> key = visitExpression(getFromListContext.nbSingle);
@@ -468,7 +468,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 				Integer nb2 = getFromListContext.nb2 == null ? null : visitExpression(getFromListContext.nb2).asInteger();
 				if (nb1 == null && nb2 == null)
 					return obj;
-				int size = obj.asList().size();
+				int size = obj.asList().size(context);
 				if (nb1 != null && (nb1 >= size || nb1 <= -size)) {
 					throw getOutOfBoundsException(scriptCause, nb1, size, getFromListContext.start);
 				}
@@ -484,7 +484,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 						return new ScriptValue<>(obj.asList().subList(nb1, nb2));
 					}
 					else {
-						return new ScriptValue<>(obj.asList().subList(nb1, obj.asList().size()));
+						return new ScriptValue<>(obj.asList().subList(nb1, obj.asList().size(context)));
 					}
 				}
 				else {
@@ -618,7 +618,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		if (ctx.FOR() == null) {
 			ScriptValueList<Object> list = new ScriptValueList<>();
 			for (ScriptsParser.ExpressionContext elemCtx: ctx.expression()) {
-				list.add((ScriptValue<Object>) visitExpression(elemCtx));
+				list.add((ScriptValue<Object>) visitExpression(elemCtx), context);
 			}
 			return new ScriptValue<>(list);
 		}
@@ -630,7 +630,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		while (iterator.hasNext()) {
 			context.assign(ctx.VARIABLE().getText(), iterator.next(), false, ctx.start);
 			if (determineBoolean(visitComparison(ifStatement)))
-				list.add((ScriptValue<Object>) visitExpression(ctx.expression(0)));
+				list.add((ScriptValue<Object>) visitExpression(ctx.expression(0)), context);
 		}
 		return new ScriptValue<>(list);
 	}
@@ -811,7 +811,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		return visitExpression(ctx.no);
 	}
 	
-	public static boolean determineBoolean(ScriptValue<?> value) {
+	public boolean determineBoolean(ScriptValue<?> value) {
 		switch (value.type) {
 			case BOOLEAN:
 				return value.asBoolean();
@@ -822,9 +822,9 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			case TEXT:
 				return value.asString().length() != 0;
 			case LIST:
-				return value.asList().size() != 0;
+				return !value.asList().isEmpty();
 			case DICTIONARY:
-				return value.asMap().size() != 0;
+				return !value.asMap().isEmpty();
 			default:
 				return false;
 		}

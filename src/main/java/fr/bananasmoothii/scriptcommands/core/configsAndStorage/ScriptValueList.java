@@ -31,7 +31,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
-// TODO: wrap all possible exceptions
 // TODO: remove all usages where possible of methods annotated @UseContext
 
 @SuppressWarnings({"unchecked"})
@@ -198,7 +197,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
             modified();
             return ret;
         }
-        ScriptValue<E> previousElement = get(index);
+        ScriptValue<E> previousElement = get(index, context);
         String query = "UPDATE `" + SQLTable + "` SET `object` = ?, `type` = ? WHERE `index` = ?";
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
@@ -242,7 +241,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
      * a <code>{@link ScriptValue}<{@link fr.bananasmoothii.scriptcommands.core.execution.NoneType NoneType}></code>
      * @param index the index of the element to be removed
      * @return the element previously at the specified position
-     * @see ScriptValueList#get(int)
+     * @see ScriptValueList#get(int, Context)
      */
     public ScriptValue<E> remove(int index, @Nullable Context context) {
         rangeCheck(index, context);
@@ -251,7 +250,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
             modified();
             return ret;
         }
-        ScriptValue<E> previous = get(index);
+        ScriptValue<E> previous = get(index, context);
         String query = "DELETE FROM `" + SQLTable + "` WHERE `index` = " + index;
         try {
             Storage.executeSQLUpdate(query);
@@ -276,7 +275,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
             modified();
             return ret;
         }
-        int index = indexOf(o);
+        int index = indexOf(o, context);
         if (index == -1) return false;
         remove(index, context);
         return true;
@@ -340,7 +339,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         ScriptValueList<E> newList = new ScriptValueList<>();
         if (arrayList != null) {
             for (; fromIndex < toIndex; fromIndex++) {
-                newList.add(get(fromIndex).clone());
+                newList.add(get(fromIndex, context).clone());
             }
             return newList;
         }
@@ -348,7 +347,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         try {
             ResultSet rs = Storage.executeSQLQuery(query);
             while (rs.next()) {
-                newList.add((ScriptValue<E>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2)));
+                newList.add((ScriptValue<E>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2)), context);
             }
         } catch (SQLException e) {
             throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
@@ -389,11 +388,11 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         clone.timesModifiedSinceLastSave -= size(); // we don't want it to save anything here
         if (arrayList != null) {
             for (ScriptValue<E> scriptValue: this) {
-                clone.add(scriptValue.clone());
+                clone.add(scriptValue.clone(), context);
             }
             return clone;
         }
-        clone.addAll(this); // element are cloned since the come from a string in SQL
+        clone.addAll(this, context); // element are cloned since the come from a string in SQL
         return clone;
     }
 
@@ -412,7 +411,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         String query = "CREATE TABLE " + SQLTable + " (`index` INT PRIMARY KEY, `object` TEXT, `type` TINYINT NOT NULL)";
         try {
             Storage.executeSQLUpdate(query);
-            addAll(copy);
+            addAll(copy, context);
             return true;
         } catch (SQLException e) {
             arrayList = copy;

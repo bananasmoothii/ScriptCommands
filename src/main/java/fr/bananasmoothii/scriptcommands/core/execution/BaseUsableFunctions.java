@@ -78,7 +78,7 @@ public class BaseUsableFunctions {
 		ScriptValueList<String> list = new ScriptValueList<>();
 		if (separator.length() == 0) {
 			for (int i = 0; i < length; i++) {
-				list.add(new ScriptValue<>(String.valueOf(string.charAt(i))));
+				list.add(new ScriptValue<>(String.valueOf(string.charAt(i))), args.context);
 			}
 		} else {
 			char c;
@@ -97,7 +97,7 @@ public class BaseUsableFunctions {
 					}
 					if (allMatch) {
 						if (element.length() != 0)
-							list.add(new ScriptValue<>(element.toString()));
+							list.add(new ScriptValue<>(element.toString()), args.context);
 						element.setLength(0);
 						i += j - 1; // - 1 as the for will add 1
 						continue;
@@ -106,7 +106,7 @@ public class BaseUsableFunctions {
 				element.append(c);
 			}
 			if (element.length() != 0)
-				list.add(new ScriptValue<>(element.toString()));
+				list.add(new ScriptValue<>(element.toString()), args.context);
 		}
 		return new ScriptValue<>(list);
 	}
@@ -119,7 +119,7 @@ public class BaseUsableFunctions {
 	@ScriptFunctionMethod
 	public static ScriptValue<?> randChoice(Args args) {
 		ScriptValueList<Object> list = args.getSingleArg().asList();
-		return list.get(ThreadLocalRandom.current().nextInt(list.size()));
+		return list.get(ThreadLocalRandom.current().nextInt(list.size(args.context)), args.context);
 	}
 
 	@NamingPatternProvider
@@ -145,7 +145,7 @@ public class BaseUsableFunctions {
 			ScriptValueList<Object> list = new ScriptValueList<>();
 			// start is used as current value
 			while (start1 < stop1) {
-				list.add(new ScriptValue<>(start1));
+				list.add(new ScriptValue<>(start1), args.context);
 				start1 += step1;
 			}
 			return new ScriptValue<>(list);
@@ -156,7 +156,7 @@ public class BaseUsableFunctions {
 		ScriptValueList<Object> list = new ScriptValueList<>();
 		// start is used as current value
 		while (start1 < stop1) {
-			list.add(new ScriptValue<>(start));
+			list.add(new ScriptValue<>(start), args.context);
 			start1 += step1;
 		}
 		return new ScriptValue<>(list);

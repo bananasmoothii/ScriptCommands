@@ -37,18 +37,19 @@ import java.util.*;
  * Warning 2: all implementations should be thread-safe.
  * @param <E> the type of each {@link ScriptValue}
  */
-public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValue<E>> implements ScriptValueCollection, ScriptValueIterable<E> {
+public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValue<E>> implements ScriptValueCollection,
+        ScriptValueIterable<E>, ContextFixable {
 
     public abstract int size(@Nullable Context context);
     @Override @UseContext
     public int size() {
-        return size(null);
+        return size(context);
     }
     
     public abstract boolean add(ScriptValue<E> element, @Nullable Context context);
     @Override @UseContext
     public boolean add(ScriptValue<E> element) {
-        return add(element, null);
+        return add(element, context);
     }
 
     public void add(int index, ScriptValue<E> element, @Nullable Context context) {
@@ -56,49 +57,67 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
     }
     @Override @UseContext
     public void add(int index, ScriptValue<E> element) {
-        add(index, element, null);
+        add(index, element, context);
     }
-    
+
+    @SuppressWarnings("unused")
+    public boolean addAll(int index, Collection<? extends ScriptValue<E>> c, @Nullable Context context) {
+        return super.addAll(index, c);
+    }
+    @Override @UseContext
+    public boolean addAll(int index, Collection<? extends ScriptValue<E>> c) {
+        return super.addAll(index, c);
+    }
+
+    @SuppressWarnings("unused")
+    public boolean addAll(Collection<? extends ScriptValue<E>> c, @Nullable Context context) {
+        return super.addAll(c);
+    }
+    @Override @UseContext
+    public boolean addAll(Collection<? extends ScriptValue<E>> c) {
+        return addAll(c, context);
+    }
+
     public abstract ScriptValue<E> set(int index, ScriptValue<E> element, @Nullable Context context);
     @Override @UseContext
     public ScriptValue<E> set(int index, ScriptValue<E> element) {
-        return set(index, element, null);
+        return set(index, element, context);
     }
 
     public abstract ScriptValue<E> get(int index, @Nullable Context context);
     @Override @UseContext
     public ScriptValue<E> get(int index) {
-        return get(index, null);
+        return get(index, context);
     }
 
     public abstract ScriptValue<E> remove(int index, @Nullable Context context);
     @Override @UseContext
     public ScriptValue<E> remove(int index) {
-        return remove(index, null);
+        return remove(index, context);
     }
 
     public abstract boolean remove(Object o, @Nullable Context context);
     @Override @UseContext
     public boolean remove(Object o) {
-        return remove(o, null);
+        return remove(o, context);
     }
 
     public abstract int indexOf(Object o, @Nullable Context context);
     @Override @UseContext
     public int indexOf(Object o) {
-        return indexOf(o, null);
+        return indexOf(o, context);
     }
 
     public abstract int lastIndexOf(Object o, @Nullable Context context);
     @Override @UseContext
     public int lastIndexOf(Object o) {
-        return lastIndexOf(o, null);
+        return lastIndexOf(o, context);
     }
 
     public abstract void clear(@Nullable Context context);
     @Override @UseContext
     public void clear() {
-        clear(null);
+        clear(context);
     }
 
     public @NotNull Iterator<ScriptValue<E>> iterator(@Nullable Context context) {
@@ -110,7 +129,7 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
     }
     @Override @UseContext
     public @NotNull ListIterator<ScriptValue<E>> listIterator() {
-        return listIterator(null);
+        return listIterator(context);
     }
 
     public @NotNull ListIterator<ScriptValue<E>> listIterator(int index, @Nullable Context context) {
@@ -118,7 +137,16 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
     }
     @Override @UseContext
     public @NotNull ListIterator<ScriptValue<E>> listIterator(int index) {
-        return listIterator(index, null);
+        return listIterator(index, context);
+    }
+
+    /**
+     * Just a little method that takes advantage of the custom implementation of iterators, even if it is likely not
+     * being used
+     */
+    @SuppressWarnings("unused")
+    public @NotNull ListIterator<ScriptValue<E>> listIterator(int fromIndex, int toIndex, @Nullable Context context) {
+        return new Itr(fromIndex, toIndex, context);
     }
 
     /**
@@ -132,14 +160,14 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
         protected final Context context;
 
         protected Itr(@Nullable Context context) {
-            this(0, size(), context);
+            this(0, size(context), context);
         }
 
         /**  
          * @param fromIndex inclusive
          */
         protected Itr(int fromIndex, @Nullable Context context) {
-            this(fromIndex, size(), context);
+            this(fromIndex, size(context), context);
         }
 
         /**
@@ -161,7 +189,7 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
         @Override
         public ScriptValue<E> next() {
             rangeCheck(currentIndex);
-            return get(currentIndex++);
+            return get(currentIndex++, context);
         }
 
         @Override
@@ -172,7 +200,7 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
         @Override
         public ScriptValue<E> previous() {
             rangeCheck(currentIndex);
-            return get(currentIndex--);
+            return get(currentIndex--, context);
         }
 
         @Override
@@ -230,7 +258,7 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
         rangeCheck(toIndex,  context);
         AbstractScriptValueList<E> newList = new ScriptValueList<>();
         for (int i = fromIndex; i < toIndex; i++) {
-            newList.add(get(i));
+            newList.add(get(i, context), context); // context context context context yum good context everywhere (I'm tired)
         }
         return newList;
     }
@@ -239,13 +267,13 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
      */
     @Override
     public AbstractScriptValueList<E> subList(int fromIndex, int toIndex) {
-        return subList(fromIndex, toIndex, null);
+        return subList(fromIndex, toIndex, context);
     }
 
     public abstract boolean contains(Object o, @Nullable Context context);
     @Override @UseContext
     public boolean contains(Object o) {
-        return contains(o, null);
+        return contains(o, context);
     }
 
     public abstract AbstractScriptValueList<E> clone();
@@ -253,7 +281,7 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
     public abstract boolean makeSQL(@Nullable Context context);
     @Override @UseContext
     public boolean makeSQL() {
-        return makeSQL(null);
+        return makeSQL(context);
     }
 
     @Override
@@ -284,19 +312,31 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
      * @see ArrayList#remove(int)
      */
     protected void rangeCheck(int index, @Nullable Context context) {
-        if (index < 0 || index >= size())
-            throw new ScriptException.Incomplete(ScriptException.ExceptionType.OUT_OF_BOUNDS, outOfBoundsMsg(index))
+        if (index < 0 || index >= size(context))
+            throw new ScriptException.Incomplete(ScriptException.ExceptionType.OUT_OF_BOUNDS, outOfBoundsMsg(index, context))
                     .completeIfPossible(context);
     }
 
     protected void rangeCheckForAdd(int index, @Nullable Context context) {
-        if (index < 0 || index > size())
-            throw new ScriptException.Incomplete(ScriptException.ExceptionType.OUT_OF_BOUNDS, outOfBoundsMsg(index))
+        if (index < 0 || index > size(context))
+            throw new ScriptException.Incomplete(ScriptException.ExceptionType.OUT_OF_BOUNDS, outOfBoundsMsg(index, context))
                     .completeIfPossible(context);
 
     }
 
-    protected String outOfBoundsMsg(int index) {
-        return "Index: "+index+", Size: "+size();
+    protected String outOfBoundsMsg(int index, @Nullable Context context) {
+        return "Index: "+index+", Size: "+size(context);
+    }
+
+    protected @Nullable Context context;
+
+    @Override
+    public void setFixedContext(@Nullable Context context) {
+        this.context = context;
+    }
+
+    @Override
+    public @Nullable Context getFixedContext() {
+        return context;
     }
 }
