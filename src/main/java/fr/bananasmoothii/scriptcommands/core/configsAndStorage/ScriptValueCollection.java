@@ -38,8 +38,6 @@ public interface ScriptValueCollection extends Cloneable {
     }
 
 
-    //TODO: think about a "static ScriptValueCollection toScriptValueList" here
-
     /**
      * The SQL table is composed by
      * <ol>
@@ -129,7 +127,7 @@ public interface ScriptValueCollection extends Cloneable {
     static ScriptValue<?> transformToScriptValue(String object, byte type) {
         switch (type) {
             case 0:
-                return new ScriptValue<>(null);
+                return ScriptValue.NONE;
             case 1:
                 return new ScriptValue<>(Integer.valueOf(object));
             case 2:

@@ -91,7 +91,7 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 	 *     </ul>
 	 * @see #NONE a better solution for getting a None ScriptValue
 	 */
-	public ScriptValue(@Nullable T obj) { // TODO: remove all usages of new ScriptValue(null) or new ScriptValue(NoneType)
+	public ScriptValue(@Nullable T obj) {
 
 		v = obj == null ? (T) NoneType.INSTANCE : obj;
 		if (obj == null || obj instanceof NoneType) type = ScriptValueType.NONE;

@@ -224,7 +224,7 @@ public class ScriptValueMap<K, V> extends AbstractScriptValueMap<K, V> {
             if (containsKey(key, context)) {
                 previousElement = get(key, context);
             } else {
-                previousElement = new ScriptValue<>(null);
+                previousElement = (ScriptValue<V>) ScriptValue.NONE;
             }
             if (containsKey(key, context)) {
                 String query = "UPDATE `" + SQLTable + "` SET `value_object` = ?, `value_type` = ? WHERE `key_object` " + getSQLEqualsSign(key) + " ? AND `key_type` = ?";
