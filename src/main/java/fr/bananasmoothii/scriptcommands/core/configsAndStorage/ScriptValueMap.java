@@ -326,7 +326,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             ResultSet rs = Storage.executeSQLQuery(query);
             ScriptValueList<V> list = new ScriptValueList<>();
             while (rs.next()) {
-                list.add((ScriptValue<V>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2)), context);
+                list.add((ScriptValue<V>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2)));//, context);
             }
             return list;
         } catch (SQLException e) {

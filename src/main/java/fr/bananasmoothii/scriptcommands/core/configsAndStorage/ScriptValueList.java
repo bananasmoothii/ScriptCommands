@@ -29,9 +29,11 @@ import org.jetbrains.annotations.Nullable;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 
-// TODO: remove all usages where possible of methods annotated @UseContext
 
 @SuppressWarnings({"unchecked"})
 public class ScriptValueList<E> extends AbstractScriptValueList<E> {
@@ -46,8 +48,9 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     /**
      * Not null only with json, use {@code arrayList == null} to know if this list (class) is using SQL.
      */
+    private @Nullable List<ScriptValue<E>> internalList;
 
-    private @Nullable ArrayList<ScriptValue<E>> arrayList;
+    private final Object modificationLock = new Object();
 
     private @NotNull StringID stringID;
     
@@ -76,12 +79,12 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
                 throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
             }
         } else {
-            arrayList = new ArrayList<>();
+            internalList = new ArrayList<>();
         }
         modified();
     }
 
-    public ScriptValueList(Collection<ScriptValue<E>> c) {
+    public ScriptValueList(Collection<? extends ScriptValue<E>> c) {
         this();
         addAll(c);
     }
@@ -128,7 +131,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
 
     @Override
     public int size(@Nullable Context context) {
-        if (arrayList != null) return arrayList.size();
+        if (internalList != null) return internalList.size();
         if (lastSize != -1 && timesModifiedSinceLastSave == 0) return lastSize;
         String query = "SELECT COUNT(*) FROM `" + SQLTable + '`';
         try {
@@ -142,11 +145,14 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     }
 
     @Override
+    @Contract(value = "_, _->true", mutates = "this") // as in List#add(E)
     public boolean add(ScriptValue<E> element, @Nullable Context context) {
-        if (arrayList != null) {
-            boolean returned = arrayList.add(element);
-            if (returned) modified();
-            return returned;
+        if (internalList != null) {
+            synchronized (modificationLock) {
+                internalList.add(element);
+            }
+            modified();
+            return true;
         }
         String query = "INSERT INTO `" + SQLTable + "` VALUES(?, ?, ?)";
         try {
@@ -165,8 +171,10 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     @Override
     public void add(int index, ScriptValue<E> element, @Nullable Context context) {
         rangeCheckForAdd(index, context);
-        if (arrayList != null) {
-            arrayList.add(index, element);
+        if (internalList != null) {
+            synchronized (modificationLock) {
+                internalList.add(index, element);
+            }
             modified();
             return;
         }
@@ -192,8 +200,11 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     @Override
     public ScriptValue<E> set(int index, ScriptValue<E> element, @Nullable Context context) {
         rangeCheck(index, context);
-        if (arrayList != null) {
-            ScriptValue<E> ret = arrayList.set(index, element);
+        if (internalList != null) {
+            ScriptValue<E> ret;
+            synchronized (modificationLock) {
+                ret = internalList.set(index, element);
+            }
             modified();
             return ret;
         }
@@ -219,8 +230,8 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     @Override
     public ScriptValue<E> get(int index, @Nullable Context context) {
         rangeCheck(index, context);
-        if (arrayList != null) {
-            return arrayList.get(index);
+        if (internalList != null) {
+            return internalList.get(index);
         }
         String query = "SELECT `object`, `type` FROM `" + SQLTable + "` WHERE `index` = " + index;
         try {
@@ -245,8 +256,11 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
      */
     public ScriptValue<E> remove(int index, @Nullable Context context) {
         rangeCheck(index, context);
-        if (arrayList != null) {
-            ScriptValue<E> ret = arrayList.remove(index);
+        if (internalList != null) {
+            ScriptValue<E> ret;
+            synchronized (modificationLock) {
+                ret = internalList.remove(index);
+            }
             modified();
             return ret;
         }
@@ -270,8 +284,11 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     @Override
     public boolean remove(Object o, @Nullable Context context) {
         if (! (o instanceof ScriptValue)) return false;
-        if (arrayList != null) {
-            boolean ret = arrayList.remove(o);
+        if (internalList != null) {
+            boolean ret;
+            synchronized (modificationLock) {
+                ret = internalList.remove(o);
+            }
             modified();
             return ret;
         }
@@ -284,8 +301,8 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     @Override
     public int indexOf(Object o, @Nullable Context context) {
         if (! (o instanceof ScriptValue)) return -1;
-        if (arrayList != null) {
-            return arrayList.indexOf(o);
+        if (internalList != null) {
+            return internalList.indexOf(o);
         }
         return indexOf(o, "ASC", context);
     }
@@ -293,8 +310,8 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     @Override
     public int lastIndexOf(Object o, @Nullable Context context) {
         if (! (o instanceof ScriptValue)) return -1;
-        if (arrayList != null) {
-            return arrayList.lastIndexOf(o);
+        if (internalList != null) {
+            return internalList.lastIndexOf(o);
         }
         return indexOf(o, "DESC", context);
     }
@@ -316,12 +333,14 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
 
     @Override
     public void clear(@Nullable Context context) {
-        if (!isEmpty()) return;
+        if (!isEmpty(context)) return;
 
-        if (arrayList != null) {
-             arrayList.clear();
-             modified();
-             return;
+        if (internalList != null) {
+            synchronized (modificationLock) {
+                internalList.clear();
+            }
+            modified();
+            return;
         }
         String query = "DELETE FROM `" + SQLTable + '`';
         try {
@@ -337,7 +356,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         rangeCheck(fromIndex, context);
         rangeCheck(toIndex - 1, context);
         ScriptValueList<E> newList = new ScriptValueList<>();
-        if (arrayList != null) {
+        if (internalList != null) {
             for (; fromIndex < toIndex; fromIndex++) {
                 newList.add(get(fromIndex, context).clone());
             }
@@ -363,7 +382,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     @Override
     public boolean contains(Object o, @Nullable Context context) {
         if (! (o instanceof ScriptValue)) return false;
-        if (arrayList != null) return arrayList.contains(o);
+        if (internalList != null) return internalList.contains(o);
         String query = "SELECT * FROM `" + SQLTable + "` WHERE `object` = ? AND `type` = ? LIMIT 1";
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
@@ -384,28 +403,31 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
      */
     @Override
     public ScriptValueList<E> clone() {
-        ScriptValueList<E> clone = new ScriptValueList<>();
-        clone.timesModifiedSinceLastSave -= size(); // we don't want it to save anything here
-        if (arrayList != null) {
-            for (ScriptValue<E> scriptValue: this) {
-                clone.add(scriptValue.clone(), context);
+        ScriptValueList<E> clone;
+        synchronized (modificationLock) {
+            clone = new ScriptValueList<>();
+            clone.timesModifiedSinceLastSave -= size(); // we don't want it to save anything here
+            if (internalList != null) {
+                for (ScriptValue<E> scriptValue : this) {
+                    clone.add(scriptValue.clone(), context);
+                }
+                return clone;
             }
-            return clone;
+            clone.addAll(this, context); // element are cloned since the come from a string in SQL
         }
-        clone.addAll(this, context); // element are cloned since the come from a string in SQL
         return clone;
     }
 
     @Override
-    public boolean makeSQL(@Nullable Context context) {
-        if (arrayList == null) return false;
+    public synchronized boolean makeSQL(@Nullable Context context) {
+        if (internalList == null) return false;
         if (! Storage.isSQL)
             throw new NotUsingSQLException("the provided Storage class is not using SQL");
-        ArrayList<ScriptValue<E>> copy = arrayList;
+        List<ScriptValue<E>> copy = internalList;
         StringID StringIDBeforeTry = stringID;
 
         lastSize = -1;
-        arrayList = null;
+        internalList = null;
         stringID = getNewStringID();
         SQLTable = getFullSQLTableName();
         String query = "CREATE TABLE " + SQLTable + " (`index` INT PRIMARY KEY, `object` TEXT, `type` TINYINT NOT NULL)";
@@ -414,34 +436,39 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
             addAll(copy, context);
             return true;
         } catch (SQLException e) {
-            arrayList = copy;
+            internalList = copy;
             stringID = StringIDBeforeTry;
             SQLTable = null;
             throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
+    /**
+     * Do not synchronise that method
+     */
     private void modified() {
-        timesModifiedSinceLastSave++;
-        if (timesModifiedSinceLastSave >= Storage.getJsonSaveInterval()) {
-            Storage.jsonSave();
-            timesModifiedSinceLastSave = 0;
+        synchronized (modificationLock) {
+            timesModifiedSinceLastSave++;
+            if (timesModifiedSinceLastSave >= Storage.getJsonSaveInterval()) {
+                Storage.jsonSave();
+                timesModifiedSinceLastSave = 0;
+            }
+            lastSize = -1;
         }
-        lastSize = -1;
     }
 
     /**
      * Contrary of {@link #toScriptValues(Object[], boolean)}
      */
-    public ArrayList<ScriptValue<E>> toArrayList() {
-        if (arrayList != null) return arrayList; // could be if !isSQL() too, theoretically
+    public List<ScriptValue<E>> toNormalList() {
+        if (internalList != null) return internalList; // could be if !isSQL() too, theoretically
         ArrayList<ScriptValue<E>> a = new ArrayList<>(size());
         a.addAll(this);
         return a;
     }
 
     /**
-     * Contrary of {@link #toArrayList()}
+     * Contrary of {@link #toNormalList()}
      * @see #toScriptValues(Object[], boolean)
      */
     public static <T> ScriptValueList<T> toScriptValues(T[] elements) {
@@ -449,7 +476,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     }
 
     /**
-     * Contrary of {@link #toArrayList()}
+     * Contrary of {@link #toNormalList()}
      * @param keysAreJson whether the keys of hashMaps should be a json of the real key, because in json, every key is a string.
      */
     public static <T> ScriptValueList<T> toScriptValues(T[] elements, boolean keysAreJson) {
@@ -473,12 +500,12 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
      * @param keysAreJson whether the keys of hashMaps should be a json of the real key, because in json, every key is a string.
      *
      */
-    public static <T> ScriptValueList<? extends T> toScriptValues(List<T> list, boolean keysAreJson) {
-        return (ScriptValueList<? extends T>) toScriptValues(list.toArray(), keysAreJson);
+    public static <T> ScriptValueList<? extends T> toScriptValues(Collection<T> collection, boolean keysAreJson) {
+        return (ScriptValueList<? extends T>) toScriptValues(collection.toArray(), keysAreJson);
     }
 
     /**
-     * contrary of {@link ScriptValueList#toScriptValues(List, boolean)}
+     * contrary of {@link ScriptValueList#toScriptValues(Collection, boolean)}
      */
     @Override
     @Contract(pure = true)

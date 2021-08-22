@@ -17,6 +17,7 @@
 package fr.bananasmoothii.scriptcommands.core.execution;
 
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
+import fr.bananasmoothii.scriptcommands.core.antlr4parsing.Parsing;
 import fr.bananasmoothii.scriptcommands.core.antlr4parsing.ScriptsParser;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.Config;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ContainingScripts.Type;
@@ -30,6 +31,7 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -88,7 +90,7 @@ public class Context implements Cloneable {
 	 * @param scriptType the type of the script
 	 * @param baseVariables variables that will be given to the script, null for no other variable
 	 */
-	public Context(@Nullable String scriptName, @Nullable Type scriptType, @Nullable StringScriptValueMap<Object> baseVariables,
+	public Context(@Nullable String scriptName, @Nullable Type scriptType, @Nullable Map<String, ScriptValue<Object>> baseVariables,
 				   @Nullable Player triggeringPlayer) {
 		this(scriptName, scriptType, baseVariables, triggeringPlayer, null);
 	}
@@ -100,7 +102,7 @@ public class Context implements Cloneable {
 	 * @param triggeringPlayer the player that triggered this command or event
 	 * @param parent if this context was created from the call of a function in the script (the stack trace is deeper)
 	 */
-	public Context(@Nullable String scriptName, @Nullable Type scriptType, @Nullable StringScriptValueMap<Object> baseVariables,
+	public Context(@Nullable String scriptName, @Nullable Type scriptType, @Nullable Map<String, ScriptValue<Object>> baseVariables,
 				   @Nullable Player triggeringPlayer, @Nullable Context parent) {
 		this.scriptName = scriptName;
 		this.scriptType = scriptType;
@@ -307,6 +309,40 @@ public class Context implements Cloneable {
 		ScriptThread scriptThread = new ScriptThread(new Context(scriptName, scriptType, baseVariables, triggeringPlayer), parseTree);
 		scriptThread.start();
 		return scriptThread;
+	}
+
+	private static final WeakHashMap<Integer, ScriptsParser.ExpressionContext> evalCache = new WeakHashMap<>();
+
+	public ScriptValue<?> eval(String expression) {
+		ScriptsParser.ExpressionContext parseTree = evalCache.computeIfAbsent(expression.hashCode(), hash -> {
+			try {
+				return Parsing.parseExpression("<eval(...)>", expression);
+			} catch (IOException e) {
+				throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, this, "Error with file encoding, Input Output or idk what went wrong");
+			} catch (ScriptsParsingException e) {
+				throw new ScriptException(ExceptionType.PARSING_ERROR, this, e.getMessage());
+			}
+		});
+		ScriptsExecutor visitor = new ScriptsExecutor(new Context(scriptName, scriptType, normalVariables.clone(), triggeringPlayer));
+		visitor.visit(parseTree);
+		return visitor.getReturned();
+	}
+
+	private static final WeakHashMap<Integer, ScriptsParser.StartContext> execCache = new WeakHashMap<>();
+
+	public ScriptValue<?> exec(String code) {
+		ScriptsParser.StartContext parseTree = execCache.computeIfAbsent(code.hashCode(), hash -> {
+			try {
+				return Parsing.parse("<exec(...)>", code);
+			} catch (IOException e) {
+				throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, this, "Error with file encoding, Input Output or idk what went wrong");
+			} catch (ScriptsParsingException e) {
+				throw new ScriptException(ExceptionType.PARSING_ERROR, this, e.getMessage());
+			}
+		});
+		ScriptsExecutor visitor = new ScriptsExecutor(new Context(scriptName, scriptType, normalVariables.clone(), triggeringPlayer));
+		visitor.visit(parseTree);
+		return visitor.getReturned();
 	}
 
 	@Override

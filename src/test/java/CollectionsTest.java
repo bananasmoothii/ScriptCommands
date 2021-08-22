@@ -1,12 +1,19 @@
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
-import fr.bananasmoothii.scriptcommands.core.configsAndStorage.*;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueMap;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.Storage;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
+import fr.bananasmoothii.scriptcommands.core.execution.AbstractScriptException;
 import fr.bananasmoothii.scriptcommands.core.execution.Context;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @SuppressWarnings("MethodMayBeStatic")
@@ -52,6 +59,8 @@ public class CollectionsTest {
         Storage.loadFromHashMap(storageHashMap);
         testEverything();
 
+        waitThreads();
+
         CustomLogger.info("\n\n========= SQLITE ===========");
         storageHashMap.put("method", "SQLite");
         Storage.loadFromHashMap(storageHashMap);
@@ -59,6 +68,9 @@ public class CollectionsTest {
         map = null;
         list = null;
         testEverything();
+
+
+        waitThreads();
     }
 
     void testEverything() {
@@ -71,6 +83,7 @@ public class CollectionsTest {
         globals();
         cloneTest();
         jsonKeysMustBeStrings();
+        threads();
     }
 
     void testList() {
@@ -284,6 +297,47 @@ public class CollectionsTest {
         list1.add(new ScriptValue<>(map1));
 
         CustomLogger.info(list1);
+    }
+
+    static List<Thread> threadsTryingToBreakThingsDown = new ArrayList<>();
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    void threads() {
+        ScriptValueList<Object> list = new ScriptValueList<>(true);
+        for (int i = 0; i < 3; i++) {
+            threadsTryingToBreakThingsDown.add(new Thread(() -> {
+                try {
+                    for (int j = 0; j < 25; j++) {
+                        list.add(getAScriptValue());
+                        list.add(getAScriptValue());
+                        list.remove(getAScriptValue());
+                    }
+                } catch (AbstractScriptException ignore) { }
+            }));
+        }
+        threadsTryingToBreakThingsDown.add(new Thread(() -> {
+            try {
+                for (int i = 0; i < 50; i++) {
+                    list.size();
+                    int index = list.lastIndexOf(getAScriptValue());
+                    list.get(index == -1 ? 0 : index);
+                    for (ScriptValue<Object> scriptValues : list) {
+                        scriptValues.toString();
+                    }
+                }
+            } catch (AbstractScriptException ignore) { }
+        }));
+        for (Thread thread : threadsTryingToBreakThingsDown) {
+            thread.start();
+        }
+    }
+
+    static void waitThreads() {
+        // waiting for each one of these threads to finish
+        for (int i = 0; i < threadsTryingToBreakThingsDown.size(); i++) {
+            if (threadsTryingToBreakThingsDown.get(i).isAlive()) i = 0;
+        }
+        threadsTryingToBreakThingsDown.clear();
     }
 
     @AfterAll

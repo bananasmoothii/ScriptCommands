@@ -820,9 +820,9 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			case DECIMAL:
 				return value.asDouble() != 0;
 			case TEXT:
-				return value.asString().length() != 0;
+				return !value.asString().isEmpty();
 			case LIST:
-				return !value.asList().isEmpty();
+				return !value.asList().isEmpty(context);
 			case DICTIONARY:
 				return !value.asMap().isEmpty();
 			default:

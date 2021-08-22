@@ -20,15 +20,16 @@ import fr.bananasmoothii.scriptcommands.core.CustomLogger;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptsParsingException;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.ParserRuleContext;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import static fr.bananasmoothii.scriptcommands.core.CustomLogger.mainLogger;
 
 public class Parsing {
 
@@ -41,11 +42,20 @@ public class Parsing {
     }
 
     public static ScriptsParser.StartContext parse(String name, String scripts, Charset charset) throws IOException, ScriptsParsingException {
+        return parse(name, scripts, charset, ScriptsParser::start);
+    }
+
+    public static ScriptsParser.ExpressionContext parseExpression(String name, String scripts) throws IOException, ScriptsParsingException {
+        return parse(name, scripts, Charset.defaultCharset(), ScriptsParser::expression);
+    }
+
+    public static <P extends ParserRuleContext> P parse(String name, String scripts, Charset charset,
+                                                        Function<? super ScriptsParser, P> parserRuleContextSupplier) throws IOException, ScriptsParsingException {
         InputStream stream = new ByteArrayInputStream(scripts.getBytes(charset));
         ScriptsLexer lexer = new ScriptsLexer(CharStreams.fromStream(stream));
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         ScriptsParser parser = new ScriptsParser(tokens);
-        ScriptsParser.StartContext context = parser.start();
+        P context = parserRuleContextSupplier.apply(parser);
         if (context.exception != null || CustomLogger.getLevel().intValue() <= 300) {
             if (dumper == null)
                 dumper = new ParserDumper();
@@ -54,7 +64,7 @@ public class Parsing {
         if (context.exception == null) {
             return context;
         }
-        throw new ScriptsParsingException("Parsing for " + name + " failed. See above message(s) for more info.");
+        throw new ScriptsParsingException("Parsing for " + name + " failed. See console message(s) for more info.");
     }
 
     public static PermissionParser.StartContext parsePermission(String commandName, String scripts) throws IOException, ScriptsParsingException {

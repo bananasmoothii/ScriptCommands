@@ -159,6 +159,12 @@ public class ScriptException extends AbstractScriptException {
                 "equivalent. For example, if you have the list [\"a\", \"b\", \"c\"], you can call elements 0 " +
                 "(-> \"a\"), 1 (-> \"b\"), 2 (-> \"c\"), or negative index -1 (-> \"c\"), -2 (-> \"b\"), -3 (-> \"a\"). " +
                 "For a list of 3 elements, these are the only 6 indexes that will not cause an OUT_OF_BOUNDS error."),
+        PARSING_ERROR("A parsing error happens with eval() or exec(). These two functions are should not be used " +
+                "for more security, code readability and performance, but they are still here in case you found no other " +
+                "way. The code you provided to one of these function is not valid. Remember that eval() accepts only an " +
+                "expression, not full lines of code. For example, here is what is an expression: log foo.bar(foo1, bar1) ; " +
+                "4 * a ; 4 > a ; 4 > a ? \"a is small\" else \"a is big\" . Here is what is not an expression: if, for, " +
+                "thread, while, try..."),
         SHOULD_NOT_HAPPEN("Hey ! You got a Should Not Happen error ! As the name states it, this error should " +
                 "never happen and it is a bug. Please report it at https://github.com/bananasmoothii/ScriptCommands/issues ."),
         UNAVAILABLE_THREAD_NAME("Unavailable thread name means that you wanted to make a new thread with a name " +

@@ -124,7 +124,7 @@ public class Args {
         this.argsList = argsList == null ? new ScriptValueList<>() : argsList;
         this.argsList.setFixedContext(context);
         this.argsMap = argsMap == null ? new StringScriptValueMap<>() : argsMap;
-        this.argsMap.setFixedContext(context);
+        //this.argsMap.setFixedContext(context); TODO
         this.context = context;
     }
 

@@ -36,6 +36,7 @@ import java.util.*;
  * {@link ScriptException.Incomplete#wrapInShouldNotHappen(Throwable)} or similar)<br/>
  * Warning 2: all implementations should be thread-safe.
  * @param <E> the type of each {@link ScriptValue}
+ * @see AbstractScriptValueMap
  */
 public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValue<E>> implements ScriptValueCollection,
         ScriptValueIterable<E>, ContextFixable {
@@ -45,7 +46,16 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
     public int size() {
         return size(context);
     }
-    
+
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    public boolean isEmpty(@Nullable Context context) {
+        return size(context) == 0;
+    }
+    @Override @UseContext
+    public boolean isEmpty() {
+        return size() == 0;
+    }
+
     public abstract boolean add(ScriptValue<E> element, @Nullable Context context);
     @Override @UseContext
     public boolean add(ScriptValue<E> element) {
