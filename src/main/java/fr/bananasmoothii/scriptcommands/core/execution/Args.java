@@ -124,7 +124,7 @@ public class Args {
         this.argsList = argsList == null ? new ScriptValueList<>() : argsList;
         this.argsList.setFixedContext(context);
         this.argsMap = argsMap == null ? new StringScriptValueMap<>() : argsMap;
-        //this.argsMap.setFixedContext(context); TODO
+        this.argsMap.setFixedContext(context);
         this.context = context;
     }
 
@@ -230,8 +230,8 @@ public class Args {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         boolean notFirstElement = false;
-        if (argsList.size() == 0) {
-            if (argsMap.size() == 0) return "";
+        if (argsList.isEmpty()) {
+            if (argsMap.isEmpty()) return "";
             Iterator<Map.Entry<String, ScriptValue<Object>>> iterator = argsMap.entrySet().iterator();
             sb.append(iterator.next());
             while (iterator.hasNext()) {
@@ -272,6 +272,6 @@ public class Args {
     }
 
     public boolean isEmpty() {
-        return argsList.size() == 0 && argsMap.size() == 0;
+        return argsList.isEmpty() && argsMap.isEmpty();
     }
 }

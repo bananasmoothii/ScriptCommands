@@ -296,11 +296,11 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 						new ContextStackTraceElement(context, "splat dictionary: " + splatCtx.getText(), splatCtx.start));
 
 			StringScriptValueMap<Object> argsMap = args.getArgsMap();
-			for (Map.Entry<ScriptValue<Object>, ScriptValue<Object>> entry: visited.asMap().entrySet()) {
+			for (Map.Entry<ScriptValue<Object>, ScriptValue<Object>> entry: visited.asMap().entrySet(context)) {
 				if (! entry.getKey().is(ScriptValueType.TEXT))
 					throw ScriptException.invalidType("a Dictionary with only strings as keys", entry.getKey().toString(),
 							new ContextStackTraceElement(context, "splat dictionary : " + splatCtx.getText(), splatCtx.start));
-				argsMap.put(entry.getKey().asString(), entry.getValue());
+				argsMap.put(entry.getKey().asString(), entry.getValue(), context);
 			}
 		}
 		return args;
@@ -350,7 +350,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 					else if (a.is(ScriptValueType.DICTIONARY) && b.is(ScriptValueType.LIST)) {
 						if (b.asList().size(context) != 2)
 							throw error;
-						a.asMap().put(b.asList().get(0, context), b.asList().get(1, context));
+						a.asMap().put(b.asList().get(0, context), b.asList().get(1, context), context);
 						return NONE;
 					}
 					else
@@ -372,7 +372,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 						return NONE;
 					}
 					else if (a.is(ScriptValueType.DICTIONARY)) {
-						a.asMap().remove(b);
+						a.asMap().remove(b, context);
 						return NONE;
 					}
 					else throw error;
@@ -442,7 +442,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			else if (obj.is(ScriptValueType.DICTIONARY)) {
 				ScriptValue<?> key = visitExpression(getFromListContext.nbSingle);
 				try {
-					return obj.asMap().get(key);
+					return obj.asMap().get(key, context);
 				} catch (ScriptException.Incomplete e) {
 					throw e.complete(new ContextStackTraceElement(context, scriptCause, getFromListContext.start));
 				}
@@ -641,7 +641,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			ScriptValueMap<Object, Object> map = new ScriptValueMap<>();
 			Iterator<ScriptsParser.ExpressionContext> iter = ctx.expression().iterator();
 			while (iter.hasNext()) {
-				map.put((ScriptValue<Object>) visitExpression(iter.next()), (ScriptValue<Object>) visitExpression(iter.next()));
+				map.put((ScriptValue<Object>) visitExpression(iter.next()), (ScriptValue<Object>) visitExpression(iter.next()), context);
 			}
 			return new ScriptValue<>(map);
 		}
@@ -654,7 +654,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		while (iterator.hasNext()) {
 			context.assign(ctx.VARIABLE().getText(), iterator.next(), false, ctx.start);
 			if (determineBoolean(visitComparison(ifStatement)))
-				map.put((ScriptValue<Object>) visitExpression(ctx.expression(0)), (ScriptValue<Object>) visitExpression(ctx.expression(1)));
+				map.put((ScriptValue<Object>) visitExpression(ctx.expression(0)), (ScriptValue<Object>) visitExpression(ctx.expression(1)), context);
 		}
 		return new ScriptValue<>(map);
 	}
@@ -712,7 +712,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 							before = new ScriptValue<>(before.asList().contains(visitComp_atom(ctx.comp_atom(i))));
 							break;
 						case DICTIONARY:
-							before = new ScriptValue<>(before.asMap().containsKey(visitComp_atom(ctx.comp_atom(i))));
+							before = new ScriptValue<>(before.asMap().containsKey(visitComp_atom(ctx.comp_atom(i)), context));
 							break;
 						case TEXT:
 							before = new ScriptValue<>(before.asString().contains(visitComp_atom(ctx.comp_atom(i)).asString()));
@@ -824,7 +824,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 			case LIST:
 				return !value.asList().isEmpty(context);
 			case DICTIONARY:
-				return !value.asMap().isEmpty();
+				return !value.asMap().isEmpty(context);
 			default:
 				return false;
 		}

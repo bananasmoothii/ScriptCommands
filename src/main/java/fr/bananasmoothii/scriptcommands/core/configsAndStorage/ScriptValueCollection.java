@@ -16,6 +16,7 @@
 
 package fr.bananasmoothii.scriptcommands.core.configsAndStorage;
 
+import fr.bananasmoothii.scriptcommands.core.execution.Context;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -95,7 +96,7 @@ public interface ScriptValueCollection extends Cloneable {
      * @throws NotUsingSQLException if the {@link Storage} given doesn't use SQL.
      */
     @SuppressWarnings("UnusedReturnValue")
-    boolean makeSQL();
+    boolean makeSQL(@Nullable Context context);
 
     ScriptValueCollection clone();
 
@@ -103,14 +104,14 @@ public interface ScriptValueCollection extends Cloneable {
      * Contrary of {@link ScriptValueCollection#transformToScriptValue(String, byte)}, this will be used to put
      * a {@link ScriptValue} <strong>in</strong> SQL.
      */
-    static void setScriptValueInPreparedStatement(PreparedStatement ps, ScriptValue<?> element, int objectIndex, int typeIndex) throws SQLException {
+    static void setScriptValueInPreparedStatement(PreparedStatement ps, ScriptValue<?> element, int objectIndex, int typeIndex, @Nullable Context context) throws SQLException {
         if (! Storage.isSQL) throw new NullPointerException("the storage class isn't using SQL");
         if (element == null || element.is(ScriptValue.ScriptValueType.NONE)) {
             ps.setString(objectIndex, null);
         } else if (element.v instanceof ScriptValueCollection) {
             ScriptValueCollection collection = (ScriptValueCollection) element.v;
             if (! collection.isUsingSQLIfPossible()) {
-                collection.makeSQL();
+                collection.makeSQL(context);
             }
             ps.setString(objectIndex, collection.getStringID().toString());
         } else if (element.is(ScriptValue.ScriptValueType.BOOLEAN)) {
@@ -122,7 +123,7 @@ public interface ScriptValueCollection extends Cloneable {
     }
 
     /**
-     * Contrary of {@link ScriptValueCollection#setScriptValueInPreparedStatement(PreparedStatement, ScriptValue, int, int)},
+     * Contrary of {@link ScriptValueCollection#setScriptValueInPreparedStatement(PreparedStatement, ScriptValue, int, int, Context)},
      * this will be used to retrieve a {@link ScriptValue} <strong>from</strong> SQL.
      */
     static ScriptValue<?> transformToScriptValue(String object, byte type) {

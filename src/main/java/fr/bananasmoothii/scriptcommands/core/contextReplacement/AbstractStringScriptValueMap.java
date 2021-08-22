@@ -25,11 +25,14 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.AbstractMap;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
 
-public abstract class AbstractScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValue<V>> implements ScriptValueCollection,
+/**
+ * Basically copy/pasted from {@link AbstractScriptValueMap} for {@link fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap}
+ * because there are some incompatibilities between {@link String} and {@link ScriptValue}
+ */
+public abstract class AbstractStringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>> implements ScriptValueCollection,
         ScriptValueIterable<ScriptValueList<Object>>, ContextFixable {
 
     public abstract int size(@Nullable Context context);
@@ -64,18 +67,18 @@ public abstract class AbstractScriptValueMap<K, V> extends AbstractMap<ScriptVal
         return get(key, context);
     }
 
-    public abstract ScriptValue<V> put(ScriptValue<K> key, ScriptValue<V> value, @Nullable Context context);
+    public abstract ScriptValue<V> put(String key, ScriptValue<V> value, @Nullable Context context);
     @Override @UseContext
-    public ScriptValue<V> put(ScriptValue<K> key, ScriptValue<V> value) {
+    public ScriptValue<V> put(String key, ScriptValue<V> value) {
         return put(key, value, context);
     }
 
     @SuppressWarnings("unused")
-    public @Nullable ScriptValue<V> putIfAbsent(ScriptValue<K> key, ScriptValue<V> value, @Nullable Context context) {
+    public @Nullable ScriptValue<V> putIfAbsent(String key, ScriptValue<V> value, @Nullable Context context) {
         return super.putIfAbsent(key, value);
     }
     @Override @UseContext
-    public @Nullable ScriptValue<V> putIfAbsent(ScriptValue<K> key, ScriptValue<V> value) {
+    public @Nullable ScriptValue<V> putIfAbsent(String key, ScriptValue<V> value) {
         return super.putIfAbsent(key, value);
     }
 
@@ -91,39 +94,39 @@ public abstract class AbstractScriptValueMap<K, V> extends AbstractMap<ScriptVal
         clear(context);
     }
 
-    public abstract @NotNull Set<ScriptValue<K>> keySet(@Nullable Context context);
+    public abstract @NotNull Set<String> keySet(@Nullable Context context);
     @Override @UseContext
-    public @NotNull Set<ScriptValue<K>> keySet() {
+    public @NotNull Set<String> keySet() {
         return keySet(context);
     }
 
-    public abstract @NotNull Collection<ScriptValue<V>> values(@Nullable Context context);
+    public abstract @NotNull ScriptValueList<V> values(@Nullable Context context);
     @Override @UseContext
-    public @NotNull Collection<ScriptValue<V>> values() {
+    public @NotNull ScriptValueList<V> values() {
         return values(context);
     }
 
-    public abstract @NotNull Set<Entry<ScriptValue<K>, ScriptValue<V>>> entrySet(@Nullable Context context);
+    public abstract @NotNull Set<Entry<String, ScriptValue<V>>> entrySet(@Nullable Context context);
     @Override @UseContext
-    public @NotNull Set<Entry<ScriptValue<K>, ScriptValue<V>>> entrySet() {
+    public @NotNull Set<Entry<String, ScriptValue<V>>> entrySet() {
         return entrySet(context);
     }
 
     @Override
     public @NotNull Iterator<ScriptValue<ScriptValueList<Object>>> iterator(@Nullable Context context) {
-        Iterator<Entry<ScriptValue<K>, ScriptValue<V>>> entryIterator = entrySet(context).iterator();
+        Iterator<Entry<String, ScriptValue<V>>> entryIterator = entrySet(context).iterator();
         return new Iterator<ScriptValue<ScriptValueList<Object>>>() {
             @Override
             public boolean hasNext() {
                 return entryIterator.hasNext();
             }
 
-            @SuppressWarnings("unchecked")
             @Override
             public ScriptValue<ScriptValueList<Object>> next() {
                 ScriptValueList<Object> pair = new ScriptValueList<>();
-                Entry<ScriptValue<K>, ScriptValue<V>> next = entryIterator.next();
-                pair.add((ScriptValue<Object>) next.getKey());
+                Entry<String, ScriptValue<V>> next = entryIterator.next();
+                pair.add(new ScriptValue<>(next.getKey()));
+                //noinspection unchecked
                 pair.add((ScriptValue<Object>) next.getValue());
                 return new ScriptValue<>(pair);
             }

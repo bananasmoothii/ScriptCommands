@@ -17,6 +17,8 @@
 package fr.bananasmoothii.scriptcommands.core.configsAndStorage;
 
 import com.google.gson.Gson;
+import fr.bananasmoothii.scriptcommands.core.contextReplacement.AbstractScriptValueMap;
+import fr.bananasmoothii.scriptcommands.core.execution.Context;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptException;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
 import fr.bananasmoothii.scriptcommands.core.execution.Types;
@@ -34,7 +36,7 @@ import java.util.*;
  * @param <V> the value type of each {@link ScriptValue}
  */
 @SuppressWarnings({"unchecked"})
-public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValue<V>> implements ScriptValueCollection {
+public class ScriptValueMap<K, V> extends AbstractScriptValueMap<K, V> {
 
     /** with prefix, null if isSQL is false. */
     private @Nullable String SQLTable;
@@ -133,7 +135,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
 
     @Override
     @Contract(pure = true)
-    public int size() {
+    public int size(@Nullable Context context) {
         if (internalMap != null) return internalMap.size();
         if (lastSize != -1 && timesModifiedSinceLastSave == 0) return lastSize;
         String query = "SELECT COUNT(*) FROM `" + SQLTable + '`';
@@ -143,12 +145,12 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             lastSize = rs.getInt(1);
             return lastSize;
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
     @Override
-    public boolean containsValue(Object value) {
+    public boolean containsValue(Object value, @Nullable Context context) {
         if (! (value instanceof ScriptValue)) return false;
         if (internalMap != null) return internalMap.containsValue(value);
         String query = "SELECT `value_object`, `value_type` FROM `" + SQLTable + '`';
@@ -163,12 +165,12 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             }
             return false;
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
     @Override
-    public boolean containsKey(Object key) {
+    public boolean containsKey(Object key, @Nullable Context context) {
         if (! (key instanceof ScriptValue)) return false;
         if (internalMap != null) return internalMap.containsKey(key);
         String query = "SELECT `key_object`, `key_type` FROM `" + SQLTable + '`';
@@ -183,7 +185,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             }
             return false;
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
@@ -195,16 +197,16 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
      *     otherwise
      */
     @Override
-    public ScriptValue<V> get(Object key) {
+    public ScriptValue<V> get(Object key, @Nullable Context context) {
         if (! (key instanceof ScriptValue)) return null;
         if (internalMap != null) return internalMap.get(key);
         String query = "SELECT `value_object`, `value_type` FROM `" + SQLTable + "` WHERE `key_object` " + getSQLEqualsSign((ScriptValue<?>) key) + " ? AND `key_type` = ?";
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
-            ScriptValueCollection.setScriptValueInPreparedStatement(ps, (ScriptValue<V>) key, 1, 2);
+            ScriptValueCollection.setScriptValueInPreparedStatement(ps, (ScriptValue<V>) key, 1, 2, context);
             query += " => " + ps;
             ResultSet rs = ps.executeQuery();
-            if (!rs.next()) return new ScriptValue<>(null);
+            if (!rs.next()) return (ScriptValue<V>) ScriptValue.NONE;
             return (ScriptValue<V>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2));
         } catch (SQLException e) {
             throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
@@ -212,39 +214,39 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
     }
 
     @Override
-    public ScriptValue<V> put(ScriptValue<K> key, ScriptValue<V> value) {
+    public ScriptValue<V> put(ScriptValue<K> key, ScriptValue<V> value, @Nullable Context context) {
         ScriptValue<V> previousElement;
         if (internalMap != null) {
             synchronized (modificationLock) {
                 previousElement = internalMap.put(key, value);
             }
         } else {
-            if (containsKey(key)) {
-                previousElement = get(key);
+            if (containsKey(key, context)) {
+                previousElement = get(key, context);
             } else {
                 previousElement = new ScriptValue<>(null);
             }
-            if (containsKey(key)) {
+            if (containsKey(key, context)) {
                 String query = "UPDATE `" + SQLTable + "` SET `value_object` = ?, `value_type` = ? WHERE `key_object` " + getSQLEqualsSign(key) + " ? AND `key_type` = ?";
                 try {
                     PreparedStatement ps = Storage.prepareSQLStatement(query);
-                    ScriptValueCollection.setScriptValueInPreparedStatement(ps, value, 1, 2);
-                    ScriptValueCollection.setScriptValueInPreparedStatement(ps, key, 3, 4);
+                    ScriptValueCollection.setScriptValueInPreparedStatement(ps, value, 1, 2, context);
+                    ScriptValueCollection.setScriptValueInPreparedStatement(ps, key, 3, 4, context);
                     query += " => " + ps;
                     ps.executeUpdate();
                 } catch (SQLException e) {
-                    throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+                    throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
                 }
             } else {
                 String query = "INSERT INTO `" + SQLTable + "` VALUES(?, ?, ?, ?)";
                 try {
                     PreparedStatement ps = Storage.prepareSQLStatement(query);
-                    ScriptValueCollection.setScriptValueInPreparedStatement(ps, key, 1, 2);
-                    ScriptValueCollection.setScriptValueInPreparedStatement(ps, value, 3, 4);
+                    ScriptValueCollection.setScriptValueInPreparedStatement(ps, key, 1, 2, context);
+                    ScriptValueCollection.setScriptValueInPreparedStatement(ps, value, 3, 4, context);
                     query += " => " + ps;
                     ps.executeUpdate();
                 } catch (SQLException e) {
-                    throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+                    throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
                 }
             }
         }
@@ -253,21 +255,22 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
     }
 
     @Override
-    public ScriptValue<V> remove(Object key) {
-        ScriptValue<V> previousElement = get(key);
+    public ScriptValue<V> remove(Object key, @Nullable Context context) {
+        ScriptValue<V> previousElement = get(key, context);
         if (internalMap != null) {
             synchronized (modificationLock) {
+                //noinspection SuspiciousMethodCalls
                 previousElement = internalMap.remove(key);
             }
         } else {
             String query = "DELETE FROM `" + SQLTable + "` WHERE `key_object` " + getSQLEqualsSign((ScriptValue<?>) key) + " ? AND `key_type` = ?";
             try {
                 PreparedStatement ps = Storage.prepareSQLStatement(query);
-                ScriptValueCollection.setScriptValueInPreparedStatement(ps, (ScriptValue<K>) key, 1, 2);
+                ScriptValueCollection.setScriptValueInPreparedStatement(ps, (ScriptValue<K>) key, 1, 2, context);
                 query += " => " + ps;
                 ps.executeUpdate();
             } catch (SQLException e) {
-                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
             }
         }
         modified();
@@ -275,7 +278,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
     }
 
     @Override
-    public void clear() {
+    public void clear(@Nullable Context context) {
         if (!isEmpty(context)) return;
 
         if (internalMap != null) {
@@ -296,12 +299,12 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
 
     @NotNull
     @Override
-    public Set<ScriptValue<K>> keySet() {
+    public Set<ScriptValue<K>> keySet(@Nullable Context context) {
         if (internalMap != null) return internalMap.keySet();
         String query = "SELECT `key_object`, `key_type` FROM `" + SQLTable + '`';
         try {
             ResultSet rs1 = Storage.executeSQLQuery(query);
-            int size1 = size();
+            int size1 = size(context);
             return new AbstractSet<ScriptValue<K>>() {
                 final int size = size1;
                 final ResultSet rs = rs1;
@@ -314,7 +317,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                             try {
                                 return rs.next();
                             } catch (SQLException e) {
-                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
                             }
                         }
 
@@ -323,7 +326,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                             try {
                                 return (ScriptValue<K>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2));
                             } catch (SQLException e) {
-                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
                             }
                         }
                     };
@@ -335,35 +338,35 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                 }
             };
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
     @NotNull
     @Override
-    public ScriptValueList<V> values() {
+    public ScriptValueList<V> values(@Nullable Context context) {
         if (internalMap != null) new ScriptValueList<>(internalMap.values());
         String query = "SELECT `value_object`, `value_type` FROM `" + SQLTable + '`';
         try {
             ResultSet rs = Storage.executeSQLQuery(query);
             ScriptValueList<V> list = new ScriptValueList<>();
             while (rs.next()) {
-                list.add((ScriptValue<V>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2)));//, context);
+                list.add((ScriptValue<V>) ScriptValueCollection.transformToScriptValue(rs.getString(1), rs.getByte(2)), context);
             }
             return list;
         } catch (SQLException e) {
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
 
     @NotNull
     @Override
-    public Set<Entry<ScriptValue<K>, ScriptValue<V>>> entrySet() {
+    public Set<Entry<ScriptValue<K>, ScriptValue<V>>> entrySet(@Nullable Context context) {
         if (internalMap != null) return internalMap.entrySet();
         String query = "SELECT * FROM `" + SQLTable + '`';
         try {
             ResultSet rs1 = Storage.executeSQLQuery(query);
-            int size1 = size();
+            int size1 = size(context);
             // sry for debugging, with all these nested lambdas xD
             return new AbstractSet<Entry<ScriptValue<K>, ScriptValue<V>>>() {
                 final int size = size1;
@@ -382,7 +385,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                             try {
                                 return rs.next();
                             } catch (SQLException e) {
-                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
                             }
                         }
 
@@ -405,7 +408,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
                                 sqlValue = rs.getString(3);
                                 sqlValueType = rs.getByte(4);
                             } catch (SQLException e) {
-                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+                                throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
                             }
 
                             return new Entry<ScriptValue<K>, ScriptValue<V>>() {
@@ -436,14 +439,14 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
 
     @Nullable
     @Override
-    public ScriptValue<V> putIfAbsent(ScriptValue<K> key, ScriptValue<V> value) {
+    public ScriptValue<V> putIfAbsent(ScriptValue<K> key, ScriptValue<V> value, @Nullable Context context) {
         ScriptValue<V> previousElement = null;
         if (internalMap != null) {
             synchronized (modificationLock) {
                 previousElement = internalMap.putIfAbsent(key, value);
             }
-        } else if (! containsKey(key)) {
-            previousElement = put(key, value);
+        } else if (! containsKey(key, context)) {
+            previousElement = put(key, value, context);
         }
         modified();
         return previousElement;
@@ -454,15 +457,14 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
      * The elements themselves are not copied over.
      * @see Object#clone()
      */
-    @SuppressWarnings("MethodDoesntCallSuperMethod")
     @Override
     public ScriptValueMap<K, V> clone() {
         synchronized (modificationLock) {
             ScriptValueMap<K, V> clone = new ScriptValueMap<>();
-            Storage.ignoreModifications(size()); // we don't want it to save anything here
+            Storage.ignoreModifications(size(context)); // we don't want it to save anything here
             if (internalMap != null) {
                 for (Entry<ScriptValue<K>, ScriptValue<V>> entry : internalMap.entrySet()) {
-                    clone.put(entry.getKey().clone(), entry.getValue().clone());
+                    clone.put(entry.getKey().clone(), entry.getValue().clone(), context);
                 }
                 return clone;
             }
@@ -472,7 +474,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
     }
 
     @Override
-    public synchronized boolean makeSQL() {
+    public synchronized boolean makeSQL(@Nullable Context context) {
         if (internalMap == null) return false;
         if (! Storage.isSQL)
             throw new NotUsingSQLException("the provided Storage class is not using SQL");
@@ -492,7 +494,7 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
             internalMap = copy;
             stringID = StringIDBeforeTry;
             SQLTable = null;
-            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
         }
     }
     
@@ -561,8 +563,8 @@ public class ScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValu
      */
     @Override
     public HashMap<Object, Object> toNormalClasses(boolean forJson) {
-        HashMap<Object, Object> finalMap = new HashMap<>(size());
-        for (Entry<ScriptValue<K>, ScriptValue<V>> entry : entrySet()) {
+        HashMap<Object, Object> finalMap = new HashMap<>(size(context));
+        for (Entry<ScriptValue<K>, ScriptValue<V>> entry : entrySet(context)) {
             Object normalKey = entry.getKey().toNormalClass(forJson);
             if (forJson) {
                 if (normalKey instanceof List || normalKey instanceof Map) {

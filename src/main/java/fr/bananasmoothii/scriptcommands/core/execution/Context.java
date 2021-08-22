@@ -233,14 +233,14 @@ public class Context implements Cloneable {
 				return pair.a.run(args.setNamingPattern(pair.b));
 			}
 
-			value = normalVariables.get(variable);
+			value = normalVariables.get(variable, this);
 			if (value != null) {
 				ScriptException.shouldHaveNoArgs(new ContextStackTraceElement(this,
 						variable, args, lineNumber, columnNumber));
 				return value;
 			}
 
-			value = globalVariables.get(variable);
+			value = globalVariables.get(variable, this);
 			if (value != null) {
 				ScriptException.shouldHaveNoArgs(new ContextStackTraceElement(this,
 						variable, args, lineNumber, columnNumber));
@@ -271,20 +271,20 @@ public class Context implements Cloneable {
 			throw new ScriptException(ExceptionType.NOT_OVERRIDABLE,
 					"You tried to create/modify \"" + key + "\", but it is already a default function.",
 					new ContextStackTraceElement(this, "ASSIGNMENT TO " + key + " = " + value, lineNumber, columnNumber));
-		} if (global && normalVariables.containsKey(key)) {
+		} if (global && normalVariables.containsKey(key, this)) {
 			throw new ScriptException(ExceptionType.NOT_OVERRIDABLE,
 					"You tried to create/modify \"" + key + "\", but that name is already taken by a global variable.",
 					new ContextStackTraceElement(this, "ASSIGNMENT TO " + key + " = " + value, lineNumber, columnNumber));
-		} if (global || globalVariables.containsKey(key)) {
-			globalVariables.put(key, (ScriptValue<Object>) value);
+		} if (global || globalVariables.containsKey(key, this)) {
+			globalVariables.put(key, (ScriptValue<Object>) value, this);
 		} else {
-			normalVariables.put(key, (ScriptValue<Object>) value);
+			normalVariables.put(key, (ScriptValue<Object>) value, this);
 		}
 	}
 
 	public void delete(String key) {
-		normalVariables.remove(key);
-		globalVariables.remove(key);
+		normalVariables.remove(key, this);
+		globalVariables.remove(key, this);
 	}
 
 	public static ScriptValue<?> trigger(Type scriptType, String scriptName, @Nullable StringScriptValueMap<Object> baseVariables, @Nullable Player triggeringPlayer) {

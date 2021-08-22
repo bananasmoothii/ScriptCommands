@@ -288,11 +288,8 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
 
     public abstract AbstractScriptValueList<E> clone();
 
+    @Override
     public abstract boolean makeSQL(@Nullable Context context);
-    @Override @UseContext
-    public boolean makeSQL() {
-        return makeSQL(context);
-    }
 
     @Override
     public Object toNormalClasses() {

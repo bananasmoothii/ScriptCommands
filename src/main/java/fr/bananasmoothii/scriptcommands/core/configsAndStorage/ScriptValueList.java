@@ -159,7 +159,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
             ps.setInt(1, size());
-            ScriptValueCollection.setScriptValueInPreparedStatement(ps, element, 2, 3);
+            ScriptValueCollection.setScriptValueInPreparedStatement(ps, element, 2, 3, context);
             query += " => " + ps;
             ps.executeUpdate();
             modified();
@@ -189,7 +189,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
             ps.setInt(1, index);
-            ScriptValueCollection.setScriptValueInPreparedStatement(ps, element, 2, 3);
+            ScriptValueCollection.setScriptValueInPreparedStatement(ps, element, 2, 3, context);
             query += " => " + ps;
             ps.executeUpdate();
             modified();
@@ -214,7 +214,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
             ps.setInt(3, index);
-            ScriptValueCollection.setScriptValueInPreparedStatement(ps, element, 1, 2);
+            ScriptValueCollection.setScriptValueInPreparedStatement(ps, element, 1, 2, context);
             ps.executeUpdate();
             query += " => " + ps;
             modified();
@@ -322,7 +322,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         String query = "SELECT `index` FROM `" + SQLTable + "` WHERE `object` = ? AND `type` = ? ORDER BY `index` " + order + " LIMIT 1";
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
-            ScriptValueCollection.setScriptValueInPreparedStatement(ps, element, 1, 2);
+            ScriptValueCollection.setScriptValueInPreparedStatement(ps, element, 1, 2, context);
             query += " => " + ps;
             ResultSet resultSet = ps.executeQuery();
             if (! resultSet.next()) return -1;
@@ -387,7 +387,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         String query = "SELECT * FROM `" + SQLTable + "` WHERE `object` = ? AND `type` = ? LIMIT 1";
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
-            ScriptValueCollection.setScriptValueInPreparedStatement(ps, (ScriptValue<?>) o, 1, 2);
+            ScriptValueCollection.setScriptValueInPreparedStatement(ps, (ScriptValue<?>) o, 1, 2, context);
             query += " => " + ps;
             ResultSet rs = ps.executeQuery();
             return rs.next();

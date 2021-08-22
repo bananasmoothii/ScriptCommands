@@ -21,6 +21,7 @@ import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValue
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map.Entry;
 
 /**
@@ -76,8 +77,8 @@ public class Types {
 			case LIST:
 				return "[" + getPrettyArgs(arg.asList()) + "]";
 			case DICTIONARY:
-				if (arg.asMap().size() != 0) {
-					ArrayList<String> keyValues = new ArrayList<>();
+				if (!arg.asMap().isEmpty()) {
+					List<String> keyValues = new ArrayList<>();
 					for (Object entryObj : arg.asMap().entrySet()) {
 						Entry<ScriptValue<?>, ScriptValue<?>> entry = (Entry<ScriptValue<?>, ScriptValue<?>>) entryObj;
 						keyValues.add(getPrettyArg(entry.getKey()) + "=" + getPrettyArg(entry.getValue()));

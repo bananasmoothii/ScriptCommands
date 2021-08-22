@@ -5,6 +5,7 @@ import fr.bananasmoothii.scriptcommands.core.configsAndStorage.Storage;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
 import fr.bananasmoothii.scriptcommands.core.execution.AbstractScriptException;
 import fr.bananasmoothii.scriptcommands.core.execution.Context;
+import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -304,6 +305,7 @@ public class CollectionsTest {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     void threads() {
         ScriptValueList<Object> list = new ScriptValueList<>(true);
+        ScriptValueMap<Object, Object> map = new ScriptValueMap<>(true);
         for (int i = 0; i < 3; i++) {
             threadsTryingToBreakThingsDown.add(new Thread(() -> {
                 try {
@@ -311,6 +313,9 @@ public class CollectionsTest {
                         list.add(getAScriptValue());
                         list.add(getAScriptValue());
                         list.remove(getAScriptValue());
+                        map.put(getAScriptValue(), getAScriptValue());
+                        map.put(getAScriptValue(), getAScriptValue());
+                        map.remove(getAScriptValue());
                     }
                 } catch (AbstractScriptException ignore) { }
             }));
@@ -324,11 +329,27 @@ public class CollectionsTest {
                     for (ScriptValue<Object> scriptValues : list) {
                         scriptValues.toString();
                     }
+                    map.size();
+                    for (Map.Entry<ScriptValue<Object>, ScriptValue<Object>> scriptValueScriptValueEntry : map.entrySet()) {
+
+                    }
+                    map.containsKey(getAScriptValue());
                 }
             } catch (AbstractScriptException ignore) { }
         }));
         for (Thread thread : threadsTryingToBreakThingsDown) {
-            thread.start();
+            runAndCatchScriptExceptions(thread::start, ExceptionType.OUT_OF_BOUNDS, ExceptionType.NOT_DEFINED);
+        }
+    }
+
+    private static void runAndCatchScriptExceptions(Runnable runnable, ExceptionType... catchTypes) {
+        try {
+            runnable.run();
+        } catch (AbstractScriptException e) {
+            for (ExceptionType catchType : catchTypes) {
+                if (catchType.name().equals(e.getStringType())) return;
+            }
+            throw e;
         }
     }
 

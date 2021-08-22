@@ -253,7 +253,7 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 		}
 		if (is(ScriptValueType.DICTIONARY)) {
 			return new Iterator<ScriptValue<?>>() {
-				private final Iterator<Entry<ScriptValue<Object>, ScriptValue<Object>>> iterator = ((ScriptValueMap<Object, Object>) v).entrySet().iterator();
+				private final Iterator<Entry<ScriptValue<Object>, ScriptValue<Object>>> iterator = ((ScriptValueMap<Object, Object>) v).entrySet(context).iterator();
 
 				@Override
 				public boolean hasNext() {
