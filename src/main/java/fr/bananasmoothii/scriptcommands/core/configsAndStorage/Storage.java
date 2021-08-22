@@ -19,12 +19,13 @@ package fr.bananasmoothii.scriptcommands.core.configsAndStorage;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
-
 import fr.bananasmoothii.scriptcommands.core.execution.Context;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +38,7 @@ public abstract class Storage {
     private static StorageMethod method = StorageMethod.JSON;
     private static @NotNull String sqlTablePrefix = "SC_";
     public static boolean isSQL = false;
-    private static HashMap<String, ?> hashMap;
+    private static Map<String, ?> rawMap;
     private static  @Nullable File file = new File("plugins/ScriptCommands/storage.json");
     public static final Gson gson;
     static {
@@ -48,18 +49,20 @@ public abstract class Storage {
                 .serializeNulls()
                 .create();
     }
-    private static int jsonSaveInterval = 5;
+    private static int jsonSaveInterval = 1;
+    private static int jsonSaveIntervalTime = 1200;
+    private static int minJsonSaveIntervalTime = 1000;
     private static  @Nullable Connection connection;
 
     public static void loadFromHashMap(@NotNull HashMap<String, ?> hashMap) {
-        Storage.hashMap = hashMap;
+        Storage.rawMap = hashMap;
 
         missingThing = "storage.method";
         assert hashMap.containsKey("method");
         String storageMethod = hashMap.get("method").toString();
         assert ! storageMethod.equals("method") && hashMap.containsKey(storageMethod);
 
-        sqlTablePrefix = (String) ((HashMap<String, Object>) hashMap.get(storageMethod)).get("table-prefix");
+        sqlTablePrefix = (String) ((Map<String, Object>) hashMap.get(storageMethod)).get("table-prefix");
         isSQL = storageMethod.contains("SQL");
 
         HashMap<String, Object> methodHashMap;
@@ -79,6 +82,16 @@ public abstract class Storage {
                 missingThing = "storage.json.save-interval";
                 assert methodHashMap.get("save-interval") instanceof Integer : "save-interval must be an integer.";
                 jsonSaveInterval = (int) methodHashMap.get("save-interval");
+
+                methodHashMap.putIfAbsent("save-interval-time", 1200);
+                missingThing = "storage.json.save-interval-time";
+                assert methodHashMap.get("save-interval-time") instanceof Integer : "save-interval-time must be an integer.";
+                jsonSaveIntervalTime = (int) methodHashMap.get("save-interval-time");
+
+                methodHashMap.putIfAbsent("min-save-interval-time", 1000);
+                missingThing = "storage.json.min-save-interval-time";
+                assert methodHashMap.get("min-save-interval-time") instanceof Integer : "min-save-interval-time must be an integer.";
+                minJsonSaveIntervalTime = (int) methodHashMap.get("min-save-interval-time");
 
                 break;
             case "SQLite":
@@ -162,7 +175,7 @@ public abstract class Storage {
             case MYSQL:
                 try {
                     Class.forName("com.mysql.cj.jdbc.Driver");
-                    HashMap<String, ?> mySQLHashMap = (HashMap<String, ?>) hashMap.get("MySQL");
+                    HashMap<String, ?> mySQLHashMap = (HashMap<String, ?>) rawMap.get("MySQL");
                     String hostname = (String) mySQLHashMap.get("hostname");
                     int port = (int) (Integer) mySQLHashMap.get("port");
                     String database = (String) mySQLHashMap.get("database");
@@ -218,27 +231,57 @@ public abstract class Storage {
         //TODO
     }
 
+    private static int timesModifiedSinceLastSave;
+    private static long lastSaveTime;
+    private static final Object modificationLock = new Object();
+
+    public static void modified(@NotNull ScriptValueCollection what) {
+        timesModifiedSinceLastSave++;
+        if (what.isUsingSQLIfPossible()) { // it means it is probably a global variable
+            long interval = System.currentTimeMillis() - lastSaveTime;
+            if ((jsonSaveInterval != -1 && timesModifiedSinceLastSave >= jsonSaveInterval && interval >= minJsonSaveIntervalTime)
+                    || (jsonSaveIntervalTime != -1 && interval >= jsonSaveIntervalTime)) {
+                jsonSave();
+            }
+        }
+    }
+
+    public static void ignoreModifications(int ignoredModifications) {
+        timesModifiedSinceLastSave -= ignoredModifications;
+    }
+
+    public static int howManyTimesModifiedSinceLastJsonSave() {
+        return timesModifiedSinceLastSave;
+    }
+
+    public static long getLastJsonSaveTime() {
+        return lastSaveTime;
+    }
+
     public static void jsonSave() {
         if (method != StorageMethod.JSON) return;
-        try {
-            //noinspection ResultOfMethodCallIgnored,ConstantConditions // because if the method is json, file won't be null
-            file.createNewFile();
-            FileWriter fileWriter = new FileWriter(file);
-            HashMap<String, Object> holeJsonHashMap = new HashMap<>();
-            //long start = System.nanoTime();
-            if (Context.globalVariables != null)
-                holeJsonHashMap.put("global_vars", Context.globalVariables.toNormalClasses(true));
-            else {
-                holeJsonHashMap.put("global_vars", new HashMap<>());
-                CustomLogger.warning("Could not save global variables with json because BaseUsableFunction didn't got initialized with a json Storage. " +
-                        "This is probably because no script was run.");
+        synchronized (modificationLock) {
+            timesModifiedSinceLastSave = 0;
+            lastSaveTime = System.currentTimeMillis();
+            try {
+                //noinspection ResultOfMethodCallIgnored,ConstantConditions // because if the method is json, file won't be null
+                file.createNewFile();
+                FileWriter fileWriter = new FileWriter(file);
+                Map<String, Object> holeJsonMap = new HashMap<>();
+                //long start = System.nanoTime();
+                if (Context.globalVariables != null)
+                    holeJsonMap.put("global_vars", Context.globalVariables.toNormalClasses(true));
+                else {
+                    holeJsonMap.put("global_vars", new HashMap<>());
+                    CustomLogger.warning("Could not save global variables with json because BaseUsableFunction didn't got initialized with a json Storage. " +
+                            "This is probably because no script was run.");
+                }
+                if (gson != null) gson.toJson(holeJsonMap, fileWriter);
+                else throw new NullPointerException("This Storage class is not using JSON");
+                fileWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            if (gson != null) gson.toJson(holeJsonHashMap, fileWriter);
-            else throw new NullPointerException("This Storage class is not using JSON");
-            //CustomLogger.info("Gson with 'keys for json' took " + (System.nanoTime() - start) + "ns");
-            fileWriter.close();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
@@ -264,18 +307,18 @@ public abstract class Storage {
     }
 
     /**
-     * @return The prefix of the tables in SQL, {@code null} if SQL isn't used.
+     * @return The prefix of the tables in SQL even if SQL isn't used
      */
-    public static @Nullable String getSQLTablePrefix() {
+    public static String getSQLTablePrefix() {
         return sqlTablePrefix;
     }
 
-    public static HashMap<String, ?> getHashMap() {
-        return hashMap;
+    public static Map<String, ?> getRawMap() {
+        return rawMap;
     }
 
-    public static void setHashMap(HashMap<String, ?> hashMap) {
-        Storage.hashMap = hashMap;
+    public static void setRawMap(Map<String, ?> rawMap) {
+        Storage.rawMap = rawMap;
     }
 
     public static @Nullable File getFile() {
@@ -290,7 +333,11 @@ public abstract class Storage {
         return jsonSaveInterval;
     }
 
-    public static void setJsonSaveInterval(int jsonSaveInterval) {
-        Storage.jsonSaveInterval = jsonSaveInterval;
+    public static int getJsonSaveIntervalTime() {
+        return jsonSaveIntervalTime;
+    }
+
+    public static int getTimesModifiedSinceLastSave() {
+        return timesModifiedSinceLastSave;
     }
 }

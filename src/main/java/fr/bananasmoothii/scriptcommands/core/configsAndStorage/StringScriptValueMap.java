@@ -56,11 +56,13 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     /**
      * Not null only with json, use {@code hashMap == null} to know if this map (class) is using SQL.
      */
-    private @Nullable HashMap<String, ScriptValue<V>> hashMap;
+    private @Nullable Map<String, ScriptValue<V>> internalMap;
+
+    private final Object modificationLock = new Object();
 
     private @NotNull StringID stringID;
 
-    private boolean useSQLIfPossible;
+    private final boolean useSQLIfPossible;
 
     private static StringID lastStringID;
 
@@ -101,7 +103,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
                 throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query);
             }
         } else {
-            hashMap = new HashMap<>();
+            internalMap = new HashMap<>();
         }
         modified();
     }
@@ -133,6 +135,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
         super();
         if (! Storage.isSQL)
             throw new NotUsingSQLException("the provided Storage class is not using SQL");
+        useSQLIfPossible = true;
         this.stringID = stringID;
         SQLTable = getFullSQLTableName();
         if (! Storage.sqlTableExists(SQLTable))
@@ -220,7 +223,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     @Override
     @Contract(pure = true)
     public int size() {
-        if (hashMap != null) return hashMap.size();
+        if (internalMap != null) return internalMap.size();
         if (lastSize != -1 && timesModifiedSinceLastSave == 0) return lastSize;
         String query = "SELECT COUNT(*) FROM `" + SQLTable + '`';
         try {
@@ -236,7 +239,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     @Override
     public boolean containsValue(Object value) {
         if (! (value instanceof ScriptValue)) return false;
-        if (hashMap != null) return hashMap.containsValue(value);
+        if (internalMap != null) return internalMap.containsValue(value);
         String query = "SELECT `value_object`, `value_type` FROM `" + SQLTable + '`';
         ScriptValue<?> value1 = (ScriptValue<?>) value;
         try {
@@ -256,7 +259,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     @Override
     public boolean containsKey(Object key) {
         if (! (key instanceof String)) return false;
-        if (hashMap != null) return hashMap.containsKey(key);
+        if (internalMap != null) return internalMap.containsKey(key);
         String query = "SELECT 1 FROM `" + SQLTable + "` WHERE `name` = ?";
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
@@ -276,7 +279,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     @Override
     public ScriptValue<V> get(Object key) {
         if (! (key instanceof String)) return null;
-        if (hashMap != null) return hashMap.get(key);
+        if (internalMap != null) return internalMap.get(key);
         String query = "SELECT `value_object`, `value_type` FROM `" + SQLTable + "` WHERE `name` = ?";
         try {
             PreparedStatement ps = Storage.prepareSQLStatement(query);
@@ -294,8 +297,11 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     public ScriptValue<V> put(String key, ScriptValue<V> value) {
         if (key.length() > 100) throw new IllegalArgumentException("the key in longer than 100 characters");
         ScriptValue<V> previousElement;
-        if (hashMap != null) previousElement = hashMap.put(key, value);
-        else {
+        if (internalMap != null) {
+            synchronized (modificationLock) {
+                previousElement = internalMap.put(key, value);
+            }
+        } else {
             previousElement = get(key);
             if (containsKey(key)) {
                 String query = "UPDATE `" + SQLTable + "` SET `value_object` = ?, `value_type` = ? WHERE `name` = ?";
@@ -328,8 +334,11 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     @Override
     public ScriptValue<V> remove(Object key) {
         ScriptValue<V> previousElement;
-        if (hashMap != null) previousElement = hashMap.remove(key);
-        else {
+        if (internalMap != null) {
+            synchronized (modificationLock) {
+                previousElement = internalMap.remove(key);
+            }
+        } else {
             previousElement = get(key);
             String query = "DELETE FROM `" + SQLTable + "` WHERE `name` = ?";
             try {
@@ -347,17 +356,28 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
 
     @Override
     public void clear() {
-        ArrayList<String> keys = new ArrayList<>(keySet());
-        for (String s: keys) {
-            remove(s);
+        if (!isEmpty(context)) return;
+
+        if (internalMap != null) {
+            synchronized (modificationLock) {
+                internalMap.clear();
+            }
+            modified();
+            return;
         }
-        modified();
+        String query = "DELETE FROM `" + SQLTable + '`';
+        try {
+            Storage.executeSQLUpdate(query);
+            modified();
+        } catch (SQLException e) {
+            throw ScriptException.Incomplete.wrapInShouldNotHappen(e, query).completeIfPossible(context);
+        }
     }
 
     @NotNull
     @Override
     public Set<String> keySet() {
-        if (hashMap != null) return hashMap.keySet();
+        if (internalMap != null) return internalMap.keySet();
         String query = "SELECT `name` FROM `" + SQLTable + '`';
         try {
             ResultSet rs1 = Storage.executeSQLQuery(query);
@@ -402,7 +422,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     @NotNull
     @Override
     public ScriptValueList<V> values() {
-        if (hashMap != null) new ScriptValueList<>(hashMap.values());
+        if (internalMap != null) new ScriptValueList<>(internalMap.values());
         String query = "SELECT `value_object`, `value_type` FROM `" + SQLTable + '`';
         try {
             ResultSet rs = Storage.executeSQLQuery(query);
@@ -419,7 +439,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     @NotNull
     @Override
     public Set<Entry<String, ScriptValue<V>>> entrySet() {
-        if (hashMap != null) return hashMap.entrySet();
+        if (internalMap != null) return internalMap.entrySet();
         String query = "SELECT * FROM `" + SQLTable + '`';
         try {
             ResultSet rs1 = Storage.executeSQLQuery(query);
@@ -450,7 +470,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
                         public Entry<String, ScriptValue<V>> next() {
                             /*
                              For some cloudy reason, when you do the "try return ResultSet.get... catch" block inside
-                             the getKey and getValue methods, the debugger can't look at what's inside of the map,
+                             the getKey and getValue methods, the debugger can't look at what's inside the map,
                              it gets an SQLException: ResultSet closed (wrapped in a ScriptException of course),
                              although "map.toString()" does work, and this problem happens only in Intellij Idea's
                              debugger, it works as a normal line of code.
@@ -497,8 +517,11 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     public ScriptValue<V> putIfAbsent(String key, ScriptValue<V> value) {
         if (key.length() > 100) throw new IllegalArgumentException("the key in longer than 100 characters");
         ScriptValue<V> previousElement = null;
-        if (hashMap != null) previousElement = hashMap.putIfAbsent(key, value);
-        else if (! containsKey(key)) {
+        if (internalMap != null) {
+            synchronized (modificationLock) {
+                previousElement = internalMap.putIfAbsent(key, value);
+            }
+        } else if (! containsKey(key)) {
             previousElement = put(key, value);
         }
         modified();
@@ -510,18 +533,21 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
      * The elements themselves are not copied over.
      * @see Object#clone()
      */
+    @SuppressWarnings("MethodDoesntCallSuperMethod")
     @Override
     public StringScriptValueMap<V> clone() {
-        StringScriptValueMap<V> clone = new StringScriptValueMap<>();
-        clone.timesModifiedSinceLastSave -= size(); // we don't want it to save anything here
-        if (hashMap != null) {
-            for (Entry<String, ScriptValue<V>> entry: hashMap.entrySet()) {
-                clone.put(entry.getKey(), entry.getValue().clone());
+        synchronized (modificationLock) {
+            StringScriptValueMap<V> clone = new StringScriptValueMap<>();
+            Storage.ignoreModifications(size()); // we don't want it to save anything here
+            if (internalMap != null) {
+                for (Entry<String, ScriptValue<V>> entry : internalMap.entrySet()) {
+                    clone.put(entry.getKey(), entry.getValue().clone());
+                }
+                return clone;
             }
+            clone.putAll(this); // element are cloned since the come from a string in SQL
             return clone;
         }
-        clone.putAll(this); // element are cloned since the come from a string in SQL
-        return clone;
     }
 
     @Override
@@ -529,16 +555,16 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
         return makeSQL(false);
     }
 
-    public boolean makeSQL(boolean isTheGlobal) {
-        if (hashMap == null) return false;
+    public synchronized boolean makeSQL(boolean isTheGlobal) {
+        if (internalMap == null) return false;
         if (! Storage.isSQL)
             throw new NotUsingSQLException("the provided Storage class is not using SQL");
-        HashMap<String, ScriptValue<V>> copy = hashMap;
+        Map<String, ScriptValue<V>> copy = internalMap;
         boolean lastIsTheGlobal = this.isTheGlobal;
         StringID StringIDBeforeTry = stringID;
 
         lastSize = -1;
-        this.hashMap = null;
+        this.internalMap = null;
         this.isTheGlobal = isTheGlobal;
         stringID = getNewStringID();
         SQLTable = getFullSQLTableName();
@@ -552,7 +578,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
             putAll(copy);
             return true;
         } catch (SQLException e) {
-            hashMap = copy;
+            internalMap = copy;
             this.isTheGlobal = lastIsTheGlobal;
             stringID = StringIDBeforeTry;
             SQLTable = null;
@@ -560,13 +586,15 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
         }
     }
 
+    /**
+     * Do not synchronise that method
+     */
     private void modified() {
-        timesModifiedSinceLastSave++;
-        if (timesModifiedSinceLastSave >= Storage.getJsonSaveInterval()) {
-            Storage.jsonSave();
-            timesModifiedSinceLastSave = 0;
+        synchronized (modificationLock) {
+            timesModifiedSinceLastSave++;
+            Storage.modified(this);
+            lastSize = -1;
         }
-        lastSize = -1;
     }
 
     /**
@@ -576,7 +604,7 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
      */
     public static <V> StringScriptValueMap<? extends V> toScriptValues(Map<String, V> map, boolean keysAreJson) {
         StringScriptValueMap<V> finalMap = new StringScriptValueMap<>();
-        finalMap.timesModifiedSinceLastSave -= map.size();
+        Storage.ignoreModifications(map.size()); // we don't want it to save anything here
         for (Entry<String, V> entry: map.entrySet()) {
             finalMap.put(entry.getKey(), (ScriptValue<V>) ScriptValue.toScriptValue(entry.getValue(), keysAreJson));
         }
@@ -606,8 +634,8 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
     }
 
     @Override
-    public int howManyTimesModifiedSinceLastSave() {
-        return timesModifiedSinceLastSave;
+    public boolean isUsingSQLIfPossible() {
+        return useSQLIfPossible;
     }
 
     @Override
@@ -627,9 +655,9 @@ public class StringScriptValueMap<V> extends AbstractMap<String, ScriptValue<V>>
      * @return {@code table_prefix + "d" + stringID}
      */
     private static String getFullSQLTableName(StringID stringID, boolean isTheGlobal) {
-        if (isTheGlobal) return ((HashMap<String, Object>) Storage.getHashMap().get("SQLite")).get("table-prefix") + "global_vars";
+        if (isTheGlobal) return ((HashMap<String, Object>) Storage.getRawMap().get("SQLite")).get("table-prefix") + "global_vars";
         if (! Storage.isSQL) throw new NotUsingSQLException("Storage class is doesn't use SQL");
-        return (String) ((HashMap<String, Object>) Storage.getHashMap().get("SQLite")).get("table-prefix") + stringID;
+        return (String) ((Map<String, Object>) Storage.getRawMap().get("SQLite")).get("table-prefix") + stringID;
     }
 
     @Override

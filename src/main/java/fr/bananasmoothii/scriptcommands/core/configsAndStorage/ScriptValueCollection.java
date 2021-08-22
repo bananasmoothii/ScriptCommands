@@ -80,9 +80,14 @@ public interface ScriptValueCollection extends Cloneable {
 
     /**
      * To know if this collection is using SQL
-     * @return generally, for example for {@link ScriptValueList}, it's something like {@code this.arrayList == null}
      */
     boolean canUseSQL();
+
+    /**
+     * At the creation of a list or map, you can specify whether your list/map should be using SQL if {@link Storage#getMethod()}
+     * is SQL.
+     */
+    boolean isUsingSQLIfPossible();
 
     /**
      * Use this with caution, it will try to make this collection using SQL. There is no way back.
@@ -91,8 +96,6 @@ public interface ScriptValueCollection extends Cloneable {
      */
     @SuppressWarnings("UnusedReturnValue")
     boolean makeSQL();
-
-    int howManyTimesModifiedSinceLastSave();
 
     ScriptValueCollection clone();
 
@@ -106,7 +109,7 @@ public interface ScriptValueCollection extends Cloneable {
             ps.setString(objectIndex, null);
         } else if (element.v instanceof ScriptValueCollection) {
             ScriptValueCollection collection = (ScriptValueCollection) element.v;
-            if (! collection.canUseSQL()) {
+            if (! collection.isUsingSQLIfPossible()) {
                 collection.makeSQL();
             }
             ps.setString(objectIndex, collection.getStringID().toString());

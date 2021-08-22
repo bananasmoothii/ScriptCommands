@@ -31,8 +31,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 @SuppressWarnings({"unchecked"})
@@ -54,7 +54,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
 
     private @NotNull StringID stringID;
     
-    private boolean useSQLIfPossible;
+    private final boolean useSQLIfPossible;
 
     private static StringID lastStringID;
 
@@ -109,6 +109,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
         super();
         if (! Storage.isSQL)
             throw new NotUsingSQLException("the provided Storage class is not using SQL");
+        useSQLIfPossible = true;
         this.stringID = stringID;
         SQLTable = getFullSQLTableName();
         if (! Storage.sqlTableExists(SQLTable))
@@ -403,10 +404,9 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
      */
     @Override
     public ScriptValueList<E> clone() {
-        ScriptValueList<E> clone;
         synchronized (modificationLock) {
-            clone = new ScriptValueList<>();
-            clone.timesModifiedSinceLastSave -= size(); // we don't want it to save anything here
+            ScriptValueList<E> clone = new ScriptValueList<>();
+            Storage.ignoreModifications(size()); // we don't want it to save anything here
             if (internalList != null) {
                 for (ScriptValue<E> scriptValue : this) {
                     clone.add(scriptValue.clone(), context);
@@ -414,8 +414,8 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
                 return clone;
             }
             clone.addAll(this, context); // element are cloned since the come from a string in SQL
+            return clone;
         }
-        return clone;
     }
 
     @Override
@@ -449,10 +449,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     private void modified() {
         synchronized (modificationLock) {
             timesModifiedSinceLastSave++;
-            if (timesModifiedSinceLastSave >= Storage.getJsonSaveInterval()) {
-                Storage.jsonSave();
-                timesModifiedSinceLastSave = 0;
-            }
+            Storage.modified(this);
             lastSize = -1;
         }
     }
@@ -462,7 +459,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
      */
     public List<ScriptValue<E>> toNormalList() {
         if (internalList != null) return internalList; // could be if !isSQL() too, theoretically
-        ArrayList<ScriptValue<E>> a = new ArrayList<>(size());
+        List<ScriptValue<E>> a = new ArrayList<>(size());
         a.addAll(this);
         return a;
     }
@@ -481,7 +478,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
      */
     public static <T> ScriptValueList<T> toScriptValues(T[] elements, boolean keysAreJson) {
         ScriptValueList<T> list = new ScriptValueList<>();
-        list.timesModifiedSinceLastSave -= elements.length;
+        Storage.ignoreModifications(elements.length);
         for (T element: elements) {
             list.add((ScriptValue<T>) ScriptValue.toScriptValue(element, keysAreJson));
         }
@@ -491,7 +488,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     /**
      * Contrary of {@link ScriptValueList#toNormalClasses(boolean)}
      */
-    public static <T> ScriptValueList<? extends T> toScriptValues(List<T> list) {
+    public static <T> ScriptValueList<? extends T> toScriptValues(Collection<? extends T> list) {
         return toScriptValues(list, false);
     }
 
@@ -500,7 +497,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
      * @param keysAreJson whether the keys of hashMaps should be a json of the real key, because in json, every key is a string.
      *
      */
-    public static <T> ScriptValueList<? extends T> toScriptValues(Collection<T> collection, boolean keysAreJson) {
+    public static <T> ScriptValueList<? extends T> toScriptValues(Collection<? extends T> collection, boolean keysAreJson) {
         return (ScriptValueList<? extends T>) toScriptValues(collection.toArray(), keysAreJson);
     }
 
@@ -528,8 +525,8 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
     }
 
     @Override
-    public int howManyTimesModifiedSinceLastSave() {
-        return timesModifiedSinceLastSave;
+    public boolean isUsingSQLIfPossible() {
+        return useSQLIfPossible;
     }
 
     @Override
@@ -550,7 +547,7 @@ public class ScriptValueList<E> extends AbstractScriptValueList<E> {
      */
     private static String getFullSQLTableName(StringID stringID) {
         if (! Storage.isSQL) throw new NotUsingSQLException("Storage class is doesn't use SQL");
-        return (String) ((HashMap<String, Object>) Storage.getHashMap().get("SQLite")).get("table-prefix") + stringID;
+        return (String) ((Map<String, Object>) Storage.getRawMap().get("SQLite")).get("table-prefix") + stringID;
     }
 
     @Override

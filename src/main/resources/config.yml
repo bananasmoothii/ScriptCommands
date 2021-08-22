@@ -22,11 +22,20 @@ storage:
 
   json:
     file-location: plugins/ScriptCommands/storage.json
+
+    # you can set one of the two following to -1 to disable them, but not both.
     
-    # interval in number of modification of any global variable (or any item in a list or dictionary) the plugin will wait for until to saveAndClose everything in the storage file.
-    # if your scripts aren't touching global variables a lot, I would recommend letting that on 1 (saveAndClose each 1 modification, so each time) so you won't lose anything if the server crash,
+    # interval in number of modification of any global variable (or any item in a list or dictionary contained in a global variable) the plugin will wait for having
+    # this number of modifications on global variables to save everything in the storage file.
+    # if your scripts aren't touching global variables a lot, I would recommend letting that on 1 (save the file each 1 modification, so each time) so you won't lose anything if the server crashes,
     # but if you're constantly modifying these variables, it can unnecessarily take lots of resources by generating a new file each time.
     save-interval: 1
+
+    # in seconds. It is a scheduled task that runs each X seconds to check if there are any modifications to global variables, and if there are, it saves the file.
+    save-interval-time: 1200
+
+    # in milliseconds. If the last json save occurred less than X milliseconds ago, it won't do anything. It can be set to 0, even if not recommended.
+    min-save-interval-time: 1000
   SQLite:
     file-location: plugins/ScriptCommands/storage.db
     table-prefix: 'SC_'
@@ -37,7 +46,7 @@ storage:
     user: ''
     password: ''
     table-prefix: 'SC_'
-    #flags: '?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC'
+    #flags: '?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false'
 
 messages:
   bad-args: 'player_msg &cBad arguments count, there should be &e{command.minArgs}&c to &e{maxArgs(command)}&c. (You put &e{args.count}&c)'

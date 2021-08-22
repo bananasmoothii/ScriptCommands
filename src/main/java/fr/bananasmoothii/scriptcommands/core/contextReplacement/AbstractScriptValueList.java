@@ -253,7 +253,7 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
 
     @Override
     public Spliterator<ScriptValue<E>> spliterator() {
-        return super.spliterator();
+        return ScriptValueIterable.super.spliterator();
     }
 
     /**
@@ -307,9 +307,6 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
 
     @Override
     public abstract boolean canUseSQL();
-
-    @Override
-    public abstract int howManyTimesModifiedSinceLastSave();
 
     @Override
     public abstract @NotNull StringID getStringID();

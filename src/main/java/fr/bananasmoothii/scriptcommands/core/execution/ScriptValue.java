@@ -190,7 +190,8 @@ public class ScriptValue<T> implements Cloneable, Iterable<ScriptValue<?>> {
 		// using regexes here because I don't want that to work if there are spaces or strange values
 		if (integerPattern.matcher(s).matches()) return new ScriptValue<>(Integer.valueOf(s));
 		if (decimalPattern.matcher(s).matches()) return new ScriptValue<>(Double.valueOf(s));
-		throw new IllegalArgumentException("the passed String (\"" + s + "\") cannot be converted to Integer, Decimal or Boolean.");
+		throw new IllegalArgumentException("the passed String (\"" + s + "\") cannot be converted to Integer, Decimal or Boolean. " +
+				"It seems like you modified the storage file, if you want to do so, please read the JavaDoc: ScriptValueMap#toNormalClasses(boolean)");
 	}
 	
 	@Override

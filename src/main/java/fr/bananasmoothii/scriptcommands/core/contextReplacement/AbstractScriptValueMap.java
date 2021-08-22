@@ -16,5 +16,144 @@
 
 package fr.bananasmoothii.scriptcommands.core.contextReplacement;
 
-public abstract class AbstractScriptValueMap {
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueCollection;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
+import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringID;
+import fr.bananasmoothii.scriptcommands.core.execution.Context;
+import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.AbstractMap;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Set;
+
+public abstract class AbstractScriptValueMap<K, V> extends AbstractMap<ScriptValue<K>, ScriptValue<V>> implements ScriptValueCollection,
+        ScriptValueIterable<ScriptValueList<Object>>, ContextFixable {
+
+    public abstract int size(@Nullable Context context);
+    @Override @UseContext
+    public int size() {
+        return size(context);
+    }
+
+    public boolean isEmpty(@Nullable Context context) {
+        return size(context) == 0;
+    }
+    @Override @UseContext
+    public boolean isEmpty() {
+        return isEmpty(context);
+    }
+
+    public abstract boolean containsValue(Object value, @Nullable Context context);
+    @Override @UseContext
+    public boolean containsValue(Object value) {
+        return containsValue(value, context);
+    }
+
+    public abstract boolean containsKey(Object key, @Nullable Context context);
+    @Override @UseContext
+    public boolean containsKey(Object key) {
+        return containsKey(key, context);
+    }
+
+    public abstract ScriptValue<V> get(Object key, @Nullable Context context);
+    @Override @UseContext
+    public ScriptValue<V> get(Object key) {
+        return get(key, context);
+    }
+
+    public abstract ScriptValue<V> put(ScriptValue<K> key, ScriptValue<V> value, @Nullable Context context);
+    @Override @UseContext
+    public ScriptValue<V> put(ScriptValue<K> key, ScriptValue<V> value) {
+        return put(key, value, context);
+    }
+
+    public abstract ScriptValue<V> remove(Object key, @Nullable Context context);
+    @Override @UseContext
+    public ScriptValue<V> remove(Object key) {
+        return remove(key, context);
+    }
+
+    public abstract void clear(@Nullable Context context);
+    @Override @UseContext
+    public void clear() {
+        clear(context);
+    }
+
+    public abstract @NotNull Set<ScriptValue<K>> keySet(@Nullable Context context);
+    @Override @UseContext
+    public @NotNull Set<ScriptValue<K>> keySet() {
+        return keySet(context);
+    }
+
+    public abstract @NotNull Collection<ScriptValue<V>> values(@Nullable Context context);
+    @Override @UseContext
+    public @NotNull Collection<ScriptValue<V>> values() {
+        return values(context);
+    }
+
+    public abstract @NotNull Set<Entry<ScriptValue<K>, ScriptValue<V>>> entrySet(@Nullable Context context);
+    @Override @UseContext
+    public @NotNull Set<Entry<ScriptValue<K>, ScriptValue<V>>> entrySet() {
+        return entrySet(context);
+    }
+
+    @Override
+    public @NotNull Iterator<ScriptValue<ScriptValueList<Object>>> iterator(@Nullable Context context) {
+        Iterator<Entry<ScriptValue<K>, ScriptValue<V>>> entryIterator = entrySet(context).iterator();
+        return new Iterator<ScriptValue<ScriptValueList<Object>>>() {
+            @Override
+            public boolean hasNext() {
+                return entryIterator.hasNext();
+            }
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public ScriptValue<ScriptValueList<Object>> next() {
+                ScriptValueList<Object> pair = new ScriptValueList<>();
+                Entry<ScriptValue<K>, ScriptValue<V>> next = entryIterator.next();
+                pair.add((ScriptValue<Object>) next.getKey());
+                pair.add((ScriptValue<Object>) next.getValue());
+                return new ScriptValue<>(pair);
+            }
+        };
+    }
+
+    protected @Nullable Context context;
+
+    @Override
+    public void setFixedContext(@Nullable Context context) {
+        this.context = context;
+    }
+
+    @Override
+    public @Nullable Context getFixedContext() {
+        return context;
+    }
+
+    @Override
+    public abstract Object toNormalClasses(boolean forJson);
+
+    @Override
+    public abstract @Nullable String getSQLTable();
+
+    @Override
+    public abstract char getTypeChar();
+
+    @Override
+    public abstract @NotNull StringID getStringID();
+
+    @Override
+    public abstract boolean canUseSQL();
+
+    public abstract boolean makeSQL(@Nullable Context context);
+    @Override @UseContext
+    public boolean makeSQL() {
+        return makeSQL(context);
+    }
+
+    @Override
+    public abstract ScriptValueCollection clone();
 }

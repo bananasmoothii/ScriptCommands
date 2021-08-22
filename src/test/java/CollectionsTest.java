@@ -332,10 +332,12 @@ public class CollectionsTest {
         }
     }
 
+    @SuppressWarnings("AssignmentToForLoopParameter")
     static void waitThreads() {
         // waiting for each one of these threads to finish
         for (int i = 0; i < threadsTryingToBreakThingsDown.size(); i++) {
-            if (threadsTryingToBreakThingsDown.get(i).isAlive()) i = 0;
+            if (threadsTryingToBreakThingsDown.get(i).isAlive())
+                i = 0;
         }
         threadsTryingToBreakThingsDown.clear();
     }

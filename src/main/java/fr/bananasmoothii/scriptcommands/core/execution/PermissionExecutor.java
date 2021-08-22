@@ -16,13 +16,11 @@
 
 package fr.bananasmoothii.scriptcommands.core.execution;
 
-import fr.bananasmoothii.scriptcommands.core.antlr4parsing.*;
+import fr.bananasmoothii.scriptcommands.core.antlr4parsing.PermissionBaseVisitor;
+import fr.bananasmoothii.scriptcommands.core.antlr4parsing.PermissionParser;
 import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.bukkit.permissions.Permissible;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.ArrayList;
 
 public class PermissionExecutor extends PermissionBaseVisitor<Boolean> {
     private final Permissible player;
@@ -33,14 +31,12 @@ public class PermissionExecutor extends PermissionBaseVisitor<Boolean> {
 
     @Override
     public Boolean visitStart(PermissionParser.StartContext ctx) {
-        if (player.isOp() || player.hasPermission("*"))
-            return true;
         return visit(ctx.block());
     }
 
     @Override
     public Boolean visitBlock(PermissionParser.BlockContext ctx) {
-        if (ctx.operator.size() == 0)
+        if (ctx.operator.isEmpty())
             return visit(ctx.atom(0));
         boolean before = executeIf(ctx.atom(0), ctx.operator.get(0), ctx.atom(1));
         for (int i = 2; i < ctx.atom().size(); i++) {
@@ -54,6 +50,9 @@ public class PermissionExecutor extends PermissionBaseVisitor<Boolean> {
      */
     @Override
     public Boolean visitRealPermission(PermissionParser.RealPermissionContext ctx) {
+        return player.hasPermission(ctx.getText());
+        // This below should be done by the permission manager
+        /*
         if (player.hasPermission(ctx.getText())) {
             return true;
         }
@@ -68,6 +67,8 @@ public class PermissionExecutor extends PermissionBaseVisitor<Boolean> {
             }
         }
         return false;
+
+         */
     }
 
     @Override
@@ -89,6 +90,7 @@ public class PermissionExecutor extends PermissionBaseVisitor<Boolean> {
         return visit(b);
     }
 
+    /*
     private static String joinWithEnd(ArrayList<String> list) {
         StringBuilder result = new StringBuilder();
         for (String string: list) {
@@ -97,4 +99,6 @@ public class PermissionExecutor extends PermissionBaseVisitor<Boolean> {
         }
         return result.toString();
     }
+
+     */
 }
