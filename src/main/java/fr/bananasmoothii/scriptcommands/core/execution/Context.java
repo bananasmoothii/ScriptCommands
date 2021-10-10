@@ -348,7 +348,9 @@ public class Context implements Cloneable {
 	@Override
 	public Context clone() {
 		try {
-			return (Context) super.clone(); // it should work, even with the volatile variables in the UsableFunction
+			Context clone = (Context) super.clone(); // it should work...
+			clone.setParent(this);
+			return clone;
 		} catch (CloneNotSupportedException e) {
 			throw ScriptException.wrapInShouldNotHappen(e, this);
 		}

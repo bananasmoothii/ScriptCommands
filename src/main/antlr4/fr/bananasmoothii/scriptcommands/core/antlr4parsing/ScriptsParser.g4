@@ -128,13 +128,16 @@ expression_between_dots
 	| OPEN_PAR expression CLOSE_PAR get_from_list*  # exprParExpr
 	;
 
+// TODO: implement in executor
 thread_expression
-    : THREAD expression ? // name of the thread
+    : THREAD
+      (IN ? expression) ? // name of the thread if "in" is not specified, else or name of the thread group
       expression
     ;
 
 thread_block
-    : THREAD expression ? // name of the thread
+    : THREAD
+      (IN ? expression) ? // name of the thread if "in" is not specified, else or name of the thread group
       block
     ;
 

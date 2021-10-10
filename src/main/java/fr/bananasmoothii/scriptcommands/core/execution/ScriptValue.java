@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
+// TODO (but not for now): function type, that will save a Method (and not a runnable because we can't really save a runnable)
+
 /**
  * Value for the Scripts. Each variable in the Scripts are in fact a ScriptValue.
  * @see ScriptValue#ScriptValue(Object) the constructor

@@ -134,6 +134,7 @@ public class ScriptException extends AbstractScriptException {
         this.scriptStackTrace = scriptStackTrace;
     }
 
+    // TODO: transform to classes so third-party programs can create new errors
     public enum ExceptionType {
         ASSERTION_ERROR("An assertion error happens when when using the \"assert\" keyword but the expression " +
                 "evaluates to false."),
@@ -154,7 +155,7 @@ public class ScriptException extends AbstractScriptException {
                 "list/dictionary/text, but the last part is not a list (e.g. when you do something like if 10 in 12 {...}"),
         NOT_OVERRIDABLE("Not overridable shows up when you try to create a variable but it already exists as " +
                 "function, or when you are creating a global variable but it already exists as non-global variable."),
-        OUT_OF_BOUNDS("out of bounds just means you called an element in a list but your index was equal or " +
+        OUT_OF_BOUNDS("Out of bounds just means you called an element in a list but your index was equal or " +
                 "above the number of elements in the list (remember that list indexes start at 0), or the negative " +
                 "equivalent. For example, if you have the list [\"a\", \"b\", \"c\"], you can call elements 0 " +
                 "(-> \"a\"), 1 (-> \"b\"), 2 (-> \"c\"), or negative index -1 (-> \"c\"), -2 (-> \"b\"), -3 (-> \"a\"). " +
@@ -168,7 +169,11 @@ public class ScriptException extends AbstractScriptException {
         SHOULD_NOT_HAPPEN("Hey ! You got a Should Not Happen error ! As the name states it, this error should " +
                 "never happen and it is a bug. Please report it at https://github.com/bananasmoothii/ScriptCommands/issues ."),
         UNAVAILABLE_THREAD_NAME("Unavailable thread name means that you wanted to make a new thread with a name " +
-                "that already exists.");
+                "that already exists."),
+        THREAD_GROUP_ERROR("A thread group error can happen either when you are trying to make a new thread " +
+                "with a group that does not exist (like `thread in \"group_that_does_not_exist\" ...`), or when you create " +
+                "a new thread group with a name that already exists (like `TODO: write this section`), or when you try " + // TODO: write these
+                "to modify a thread group that does not exist (like `TODO: write this section too`)̀.");
 
         public final String description;
 
@@ -329,7 +334,6 @@ public class ScriptException extends AbstractScriptException {
             return complete(context, where);
         }
 
-        @SuppressWarnings("ConstantConditions")
         public ScriptException complete(@NotNull ContextStackTraceElement where) {
             return complete(where.context, where);
         }

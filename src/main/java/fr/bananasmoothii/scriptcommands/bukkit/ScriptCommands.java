@@ -51,3 +51,4 @@ public final class ScriptCommands extends JavaPlugin {
 //TODO: make the default commands (reload...)
 //TODO: onServerStart and onServerStop events
 //TODO: support drag-and-drop files
+//TODO: better packages (for example I don't like ScriptValueList being in configsAndStorage and ScriptValue being in execution)
