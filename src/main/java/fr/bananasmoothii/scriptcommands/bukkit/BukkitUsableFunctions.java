@@ -100,5 +100,6 @@ public class BukkitUsableFunctions {
         return NONE;
     }
 
-    // TODO: import and manage functions
+    //TODO: more functions:
+    // - papi
 }

@@ -57,12 +57,6 @@ public class Args {
             return this;
         }
 
-        @Deprecated
-        public NamingPattern setDefaultValues(Map<String, ScriptValue<Object>> defaultValuesMap) {
-            defaultValues = defaultValuesMap;
-            return this;
-        }
-
         public NamingPattern setDefaultValue(String argName, ScriptValue<Object> defaultScriptValue) {
             defaultValues.put(argName, defaultScriptValue);
             return this;

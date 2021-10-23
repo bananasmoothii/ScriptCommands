@@ -21,7 +21,9 @@ import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
 import fr.bananasmoothii.scriptcommands.core.execution.*;
 import fr.bananasmoothii.scriptcommands.core.execution.Args.NamingPattern;
 
+import javax.naming.InvalidNameException;
 import java.util.ArrayList;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.NONE;
@@ -112,11 +114,6 @@ public class BaseUsableFunctions {
 	}
 
 	@ScriptFunctionMethod
-	public static ScriptValue<?> papi(Args args) {
-		return new ScriptValue<>("papi: " + args.getSingleArg());
-	}
-
-	@ScriptFunctionMethod
 	public static ScriptValue<?> randChoice(Args args) {
 		ScriptValueList<Object> list = args.getSingleArg().asList();
 		return list.get(ThreadLocalRandom.current().nextInt(list.size(args.context)), args.context);
@@ -163,7 +160,7 @@ public class BaseUsableFunctions {
 	}
 
 	@ScriptFunctionMethod
-	public static ScriptValue<Integer> toInteger(Args args) {
+	public static ScriptValue<Integer> to_integer(Args args) {
 		ScriptValue<?> arg = args.getSingleArg();
 		switch (arg.type) {
 			case TEXT:
@@ -188,17 +185,41 @@ public class BaseUsableFunctions {
 		}
 	}
 
-	@NamingPatternProvider
-	public static final NamingPattern add = new NamingPattern()
-			.setNamingPattern("list");
-
 	@ScriptFunctionMethod
 	public static ScriptValue<NoneType> add(Args args) {
-		ScriptValueList<Object> list = args.getArg("list").asList();
+		ScriptValueList<Object> list = args.getSingleArg().asList();
 		ScriptValueList<Object> remainingArgs = args.getRemainingArgsList();
 		list.addAll(remainingArgs.clone());
 		return NONE;
 	}
 
-	//TODO: do more functions, for example: eval, exec, function to modify lists/dictionaries and other more minecraft-related
+	@NamingPatternProvider
+	public static final NamingPattern init_thread_group = new NamingPattern()
+			.setNamingPattern("name", "threadNb")
+			.setDefaultValue("threadNb", -1);
+
+	@ScriptFunctionMethod
+	public static ScriptValue<NoneType> init_thread_group(Args args) {
+		int threadNb = args.getArg("threadNb").asInteger();
+		String name = args.getArg("name").asString();
+		try {
+			if (threadNb > 0) {
+					ScriptThread.initialiseThreadGroup(name,
+							Executors.newFixedThreadPool(threadNb, r -> new Thread(ScriptThread.DEFAULT_SCRIPTCOMMANDS_THREAD_GROUP, r, name)));
+			} else if (threadNb == -1) {
+				ScriptThread.initialiseThreadGroup(name,
+						Executors.newCachedThreadPool(r -> new Thread(ScriptThread.DEFAULT_SCRIPTCOMMANDS_THREAD_GROUP, r, name)));
+			} else {
+				throw new ScriptException(ExceptionType.INVALID_ARGUMENTS, args.context, "Not a valid thread number: " + threadNb +
+						". It should be -1 or any number greater or equal to 1.");
+			}
+		} catch (InvalidNameException e) {
+			throw new ScriptException(ExceptionType.THREAD_GROUP_ERROR, args.context, e.getMessage());
+		}
+		return NONE;
+	}
+
+	//TODO: do more functions:
+	// - eval and exec
+	// - remove, insert, size, clear, subList, merge
 }
