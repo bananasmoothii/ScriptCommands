@@ -155,9 +155,9 @@ commands:
       - script } varB = [12, 6.3, "7272n", log [1, 2, 3.0, "b"]] }
       - 'player_msg varB: {=varB.join(" and ")} {=1.thing(3, 5, "7")}'
 
-functions:
+functions: # TODO: arguments
   
-  thing: # TODO: should be thing(mandatory1, mandatory2 | not_mandatory3, not_mandatory4, *everything_else)
+  thing:
     script:
       - script varC = [22]
       - script for i in range(8).addList(args) {
