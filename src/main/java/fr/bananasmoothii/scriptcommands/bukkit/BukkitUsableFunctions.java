@@ -20,6 +20,8 @@ package fr.bananasmoothii.scriptcommands.bukkit;
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
 import fr.bananasmoothii.scriptcommands.core.Util;
 import fr.bananasmoothii.scriptcommands.core.execution.*;
+import fr.bananasmoothii.scriptcommands.core.functions.NamingPatternProvider;
+import fr.bananasmoothii.scriptcommands.core.functions.ScriptFunctionMethod;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
@@ -35,7 +37,7 @@ import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.NONE;
 public class BukkitUsableFunctions {
 
     private static void runSync(Runnable runnable) {
-        Bukkit.getScheduler().runTask(ScriptCommands.inst(), runnable);
+        Bukkit.getScheduler().runTask(ScriptCommandsPlugin.inst(), runnable);
     }
 
     private static List<@Nullable Player> getPlayersFromList(ScriptValue<?> arg, @NotNull Context context) {

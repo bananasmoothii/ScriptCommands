@@ -17,7 +17,11 @@
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.Config;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ContainingScripts;
-import fr.bananasmoothii.scriptcommands.core.execution.*;
+import fr.bananasmoothii.scriptcommands.core.execution.Args;
+import fr.bananasmoothii.scriptcommands.core.execution.Context;
+import fr.bananasmoothii.scriptcommands.core.execution.NoneType;
+import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
+import fr.bananasmoothii.scriptcommands.core.functions.ScriptFunctionMethod;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;

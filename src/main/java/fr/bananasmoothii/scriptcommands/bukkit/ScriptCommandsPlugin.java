@@ -23,9 +23,9 @@ import fr.bananasmoothii.scriptcommands.core.configsAndStorage.Storage;
 import fr.bananasmoothii.scriptcommands.core.execution.Context;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class ScriptCommands extends JavaPlugin {
+public final class ScriptCommandsPlugin extends JavaPlugin {
 
-    private static ScriptCommands inst;
+    private static ScriptCommandsPlugin inst;
 
     @Override
     public void onEnable() {
@@ -43,7 +43,7 @@ public final class ScriptCommands extends JavaPlugin {
         Storage.saveAndClose();
     }
 
-    public static ScriptCommands inst() {
+    public static ScriptCommandsPlugin inst() {
         return inst;
     }
 }
@@ -51,4 +51,3 @@ public final class ScriptCommands extends JavaPlugin {
 //TODO: make the default commands (reload...)
 //TODO: onServerStart and onServerStop events
 //TODO: support drag-and-drop files
-//TODO: better packages (for example I don't like ScriptValueList being in configsAndStorage and ScriptValue being in execution)

@@ -24,6 +24,7 @@ import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ContainingScripts
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ContextStackTraceElement;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ScriptStackTraceElement;
+import fr.bananasmoothii.scriptcommands.core.functions.*;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.misc.Pair;
 import org.bukkit.entity.Player;
