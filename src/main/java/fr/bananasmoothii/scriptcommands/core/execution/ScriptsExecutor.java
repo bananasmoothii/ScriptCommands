@@ -23,16 +23,15 @@ import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueMap;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ContextStackTraceElement;
-import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.naming.InvalidNameException;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.NONE;
 import static fr.bananasmoothii.scriptcommands.core.execution.ScriptValue.ScriptValueType;
@@ -43,7 +42,9 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	
 	protected final Context context;
 
-	private ScriptValue<?> returned = NONE;
+	private @NotNull ScriptValue<?> returned = NONE;
+	private boolean hasReturned;
+	private @Nullable Consumer<? super ScriptValue<?>> onReturn;
 	/** Can be:
 	 * <ul><li>{@code 'n'} for nothing</li>
 	 * <li>{@code 'b'} for simple boucle break</li>
@@ -55,9 +56,30 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	public ScriptsExecutor(Context context) {
 		this.context = context;
 	}
-	
-	public ScriptValue<?> getReturned() {
+
+	/**
+	 * @return the return value of the script if it reached a "return" statement, {@link ScriptValue#NONE} otherwise.
+	 * @see #hasReturned()
+	 */
+	public @NotNull ScriptValue<?> getReturned() {
 		return returned;
+	}
+
+	/**
+	 * @return whether the script reached a "return" statement
+	 * @see #getReturned()
+	 */
+	public boolean hasReturned() {
+		return hasReturned;
+	}
+
+	/**
+	 * Runs "action" with the returned {@link ScriptValue} when a "return" block has been reached (this happens only once).
+	 * You can add as many actions as you want, it will use {@link Consumer#andThen(Consumer)}
+	 */
+	public void onReturn(Consumer<? super ScriptValue<?>> action) {
+		if (onReturn == null) onReturn = action;
+		else onReturn = onReturn.andThen((Consumer<Object>) action);
 	}
 
 	public void forceReturn() {
@@ -66,7 +88,8 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 
 	@Override
 	public ScriptValue<?> visit(ParseTree tree) {
-		if (breaking != 'n') return null;
+		if (breaking != 'n') return NONE;
+		if (hasReturned) throw new IllegalStateException("cannot run anything if a \"return\" statement has been reached.");
 		return super.visit(tree);
 	}
 	
@@ -119,7 +142,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	public ScriptValue<NoneType> visitFor_block(ScriptsParser.For_blockContext ctx) {
 		Iterator<ScriptValue<?>> iterator = null;
 		if (ctx.expression().expression_part().function().size() == 1 &&
-				ctx.expression().expression_part().function(0).get_from_list().size() == 0)
+				ctx.expression().expression_part().function(0).get_from_list().isEmpty())
 			iterator = Context.getIterator(ctx.expression().expression_part().function(0).VARIABLE().getText(),
 					visitArgs(ctx.expression().expression_part().function(0).arguments()));
 		if (iterator == null) {
@@ -168,7 +191,7 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 						throw ScriptException.invalidType("Text or Boolean", expr,
 								new ContextStackTraceElement(context,"try {...} catch", ctx.start));
 					}
-					if (expr.is(ScriptValueType.TEXT) && expr.asString().equals(((ScriptException) e).getStringType())
+					if (expr.is(ScriptValueType.TEXT) && expr.asString().equals(((AbstractScriptException) e).getStringType())
 							|| (expr.is(ScriptValueType.BOOLEAN) && expr.asBoolean())) {
 						if (catchCtx.varToAssign != null)
 							context.assign(catchCtx.varToAssign.getText(), expr, false, catchCtx.start.getLine(), catchCtx.start.getCharPositionInLine());
@@ -198,7 +221,9 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	public ScriptValue<NoneType> visitReturn(ScriptsParser.ReturnContext ctx) {
 		if (ctx.expression() != null)
 			returned = visit(ctx.expression());
+		hasReturned = true;
 		breaking = 'r';
+		if (onReturn != null) onReturn.accept(returned);
 		return NONE;
 	}
 	
@@ -212,38 +237,34 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 	}
 
 	@Override
-	public ScriptValue<NoneType> visitThread_expression(ScriptsParser.Thread_expressionContext ctx) {
+	public ScriptValue<String> visitThread_expression(ScriptsParser.Thread_expressionContext ctx) {
 		boolean presentId = ctx.expression().size() == 2;
-		ScriptValue<?> threadId = presentId ? visitExpression(ctx.expression(0)) : null;
+		String threadName = presentId ? visitExpression(ctx.expression(0)).asString() : null;
 		ScriptsParser.ExpressionContext ctxToExecute = presentId ? ctx.expression(1) : ctx.expression(0);
-		try {
-			new ScriptThread(context, ctxToExecute, threadId).start();
-		} catch (InvalidNameException e) {
-			if (threadId != null)
-				throw new ScriptException(ExceptionType.UNAVAILABLE_THREAD_NAME, "The name \"" + threadId + "\" is already taken.",
-						new ContextStackTraceElement(context, "thread " + ctx.expression(0).getText(), ctx.start));
-			else
-				throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, "This is an error that should not happen when no ID is specified.",
-						new ContextStackTraceElement(context, "thread " + ctx.expression(0).getText(), ctx.start));
+		ScriptThread scriptThread;
+		if (ctx.IN() != null) {
+			//noinspection ConstantConditions because if IN is present, there has to be that expression according to the ANTLR4 grammar
+			scriptThread = new ScriptThread(ctxToExecute, context, threadName);
+		} else {
+			scriptThread = new ScriptThread(threadName, ctxToExecute, context);
 		}
-		return NONE;
+		scriptThread.start();
+		return new ScriptValue<>(scriptThread.getThreadName());
 	}
 
 	@Override
-	public ScriptValue<?> visitThread_block(ScriptsParser.Thread_blockContext ctx) {
-		ScriptValue<?> threadId = ctx.expression() != null ? visitExpression(ctx.expression()) : null;
+	public ScriptValue<String> visitThread_block(ScriptsParser.Thread_blockContext ctx) {
+		String threadName = ctx.expression() != null ? visitExpression(ctx.expression()).asString() : null;
 		ScriptsParser.BlockContext ctxToExecute = ctx.block();
-		try {
-			new ScriptThread(context, ctxToExecute, threadId).start();
-		} catch (InvalidNameException e) {
-			if (threadId != null)
-				throw new ScriptException(ExceptionType.UNAVAILABLE_THREAD_NAME, "The name \"" + threadId + "\" is already taken.",
-						new ContextStackTraceElement(context, "thread " + ctx.expression().getText(), ctx.start));
-			else
-				throw new ScriptException(ExceptionType.SHOULD_NOT_HAPPEN, "This is an error that should not happen when no ID is specified.",
-						new ContextStackTraceElement(context, "thread " + ctx.expression().getText(), ctx.start));
+		ScriptThread scriptThread;
+		if (ctx.IN() != null) {
+			//noinspection ConstantConditions because if IN is present, there has to be that expression according to the ANTLR4 grammar
+			scriptThread = new ScriptThread(ctxToExecute, context, threadName);
+		} else {
+			scriptThread = new ScriptThread(threadName, ctxToExecute, context);
 		}
-		return NONE;
+		scriptThread.start();
+		return new ScriptValue<>(scriptThread.getThreadName());
 	}
 
 	@Override
@@ -414,15 +435,33 @@ public class ScriptsExecutor extends ScriptsParserBaseVisitor<ScriptValue<?>> { 
 		if (ctx.operator != null) {
 			ScriptValue<?> varValue = context.callAndRun(varName);
 			context.assign(varName,
-					calculate(varValue, ctx.operator, value.clone(), ctx.getText(), global),
+					calculate(varValue, ctx.operator, value.clone(), ctx.getText(), global), // same here (for the clone)
 					global,
 					ctx.start);
 		}
 		else
-			context.assign(varName, value.clone(), global, ctx.start);
+			context.assign(varName, value.clone(), global, ctx.start); // TODO: check if the "clone" is a wanted feature or just a bug
 		return NONE;
 	}
-	
+
+	@Override
+	public ScriptValue<NoneType> visitBlock_assignment(ScriptsParser.Block_assignmentContext ctx) {
+		String varName = ctx.VARIABLE().getText();
+		ScriptValue<?> value = visitThread_block(ctx.value);
+		boolean global = ctx.GLOBAL() != null;
+
+		if (ctx.operator != null) {
+			ScriptValue<?> varValue = context.callAndRun(varName);
+			context.assign(varName,
+					calculate(varValue, ctx.operator, value, ctx.getText(), global),
+					global,
+					ctx.start);
+		}
+		else
+			context.assign(varName, value, global, ctx.start); // no need to clone here
+		return NONE;
+	}
+
 	@Override
 	public ScriptValue<NoneType> visitDeletion(ScriptsParser.DeletionContext ctx) {
 		context.delete(ctx.VARIABLE().getText()); // easy :D

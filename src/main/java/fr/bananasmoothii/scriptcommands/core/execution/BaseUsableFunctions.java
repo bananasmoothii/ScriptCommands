@@ -19,7 +19,6 @@ package fr.bananasmoothii.scriptcommands.core.execution;
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
 import fr.bananasmoothii.scriptcommands.core.execution.Args.NamingPattern;
-import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType;
 
 import java.util.ArrayList;
 import java.util.concurrent.ThreadLocalRandom;

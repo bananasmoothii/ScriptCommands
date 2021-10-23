@@ -16,7 +16,8 @@
 
 package fr.bananasmoothii.scriptcommands.core.configsAndStorage;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.TypeAdapter;
 import com.google.gson.internal.LinkedTreeMap;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
@@ -28,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Thanks StackOverflow !</br>
+ * Thanks StackOverflow !<br/>
  * This changes only one line: line 69 here (source: from {@link com.google.gson.internal.bind.ObjectTypeAdapter}),
  * this makes it possible to have a difference between integers and doubles.
  */

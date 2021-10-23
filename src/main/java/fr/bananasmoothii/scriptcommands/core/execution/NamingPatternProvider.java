@@ -20,7 +20,7 @@ import java.lang.annotation.*;
 
 /**
  * This annotation is for <strong>public static final</strong> fields of type {@link fr.bananasmoothii.scriptcommands.core.execution.Args.NamingPattern}.
- * It will be used by {@link Context#registerMethodsFromClass(Object)} for making a
+ * It will be used by {@link Context#registerMethodsFromClass(Class)} for making a
  * {@link fr.bananasmoothii.scriptcommands.core.execution.Args.NamingPattern} only once.
  */
 @Retention(RetentionPolicy.RUNTIME)

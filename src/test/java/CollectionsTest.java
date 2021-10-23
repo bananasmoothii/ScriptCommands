@@ -5,7 +5,7 @@ import fr.bananasmoothii.scriptcommands.core.configsAndStorage.Storage;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
 import fr.bananasmoothii.scriptcommands.core.execution.AbstractScriptException;
 import fr.bananasmoothii.scriptcommands.core.execution.Context;
-import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType;
+import fr.bananasmoothii.scriptcommands.core.execution.ExceptionType;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -347,7 +347,7 @@ public class CollectionsTest {
             runnable.run();
         } catch (AbstractScriptException e) {
             for (ExceptionType catchType : catchTypes) {
-                if (catchType.name().equals(e.getStringType())) return;
+                if (catchType.getName().equals(e.getStringType())) return;
             }
             throw e;
         }

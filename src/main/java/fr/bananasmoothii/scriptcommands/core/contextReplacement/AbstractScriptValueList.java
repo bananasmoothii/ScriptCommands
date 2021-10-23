@@ -19,10 +19,7 @@ package fr.bananasmoothii.scriptcommands.core.contextReplacement;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueCollection;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ScriptValueList;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringID;
-import fr.bananasmoothii.scriptcommands.core.execution.AbstractScriptException;
-import fr.bananasmoothii.scriptcommands.core.execution.Context;
-import fr.bananasmoothii.scriptcommands.core.execution.ScriptException;
-import fr.bananasmoothii.scriptcommands.core.execution.ScriptValue;
+import fr.bananasmoothii.scriptcommands.core.execution.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -241,7 +238,7 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
         }
 
         protected void rangeCheck(int index) {
-            if (index < fromIndex || index >= toIndex) throw new ScriptException.Incomplete(ScriptException.ExceptionType.OUT_OF_BOUNDS,
+            if (index < fromIndex || index >= toIndex) throw new ScriptException.Incomplete(ExceptionType.OUT_OF_BOUNDS,
                     "Invalid index: " + index + " for list iterator from " + fromIndex + " to " + toIndex).completeIfPossible(context);
         }
     }
@@ -317,13 +314,13 @@ public abstract class AbstractScriptValueList<E> extends AbstractList<ScriptValu
      */
     protected void rangeCheck(int index, @Nullable Context context) {
         if (index < 0 || index >= size(context))
-            throw new ScriptException.Incomplete(ScriptException.ExceptionType.OUT_OF_BOUNDS, outOfBoundsMsg(index, context))
+            throw new ScriptException.Incomplete(ExceptionType.OUT_OF_BOUNDS, outOfBoundsMsg(index, context))
                     .completeIfPossible(context);
     }
 
     protected void rangeCheckForAdd(int index, @Nullable Context context) {
         if (index < 0 || index > size(context))
-            throw new ScriptException.Incomplete(ScriptException.ExceptionType.OUT_OF_BOUNDS, outOfBoundsMsg(index, context))
+            throw new ScriptException.Incomplete(ExceptionType.OUT_OF_BOUNDS, outOfBoundsMsg(index, context))
                     .completeIfPossible(context);
 
     }

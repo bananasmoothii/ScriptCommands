@@ -31,19 +31,25 @@ public class ScriptThread implements Future<ScriptValue<?>> {
     private final @NotNull String threadName;
     private final @Nullable String group;
     private ScriptsExecutor scriptsExecutor;
+    private @Nullable Thread thread;
+    private @Nullable Future<Void> futureFromExecutorService;
+    private boolean isCancelled;
 
     public static final ThreadGroup DEFAULT_SCRIPTCOMMANDS_THREAD_GROUP = new ThreadGroup("ScriptCommand-Threads");
     private static final List<ScriptThread> threads = new ArrayList<>();
-    private static final Map<String, Executor> threadGroupExecutors = new HashMap<>();
+    private static final Map<String, ExecutorService> threadGroupExecutors = new HashMap<>();
 
     /**
      * New instance specifying a group
+     * @param ctxToExecute the ANTLR4 context that will be executed
+     * @param context the parent context, will be cloned
+     * @param group the thread group name
      * @throws ScriptException if the group does not exist.
-     * @see #initialiseThreadGroup(String, Executor)
+     * @see #initialiseThreadGroup(String, ExecutorService)
      */
-    public ScriptThread(@NotNull ParserRuleContext ctxToExecute, @NotNull Context context, @Nullable String group) {
+    public ScriptThread(@NotNull ParserRuleContext ctxToExecute, @NotNull Context context, @NotNull String group) {
         if (! threadGroupExecutors.containsKey(Objects.requireNonNull(group, "group was null in ScriptThread instantiation")))
-            throw new ScriptException(ScriptException.ExceptionType.THREAD_GROUP_ERROR, context, "Thread group \"" + group + "\" was not initialised.");
+            throw new ScriptException(ExceptionType.THREAD_GROUP_ERROR, context, "Thread group \"" + group + "\" was not initialised.");
         this.ctxToExecute = Objects.requireNonNull(ctxToExecute, "ctxToExecute was null in ScriptThread instantiation");
         // if it wouldn't be cloned, it would force the user to make separate variables if two thread are doing the same thing...
         this.context = Objects.requireNonNull(context, "context was null in ScriptThread instantiation").clone();
@@ -53,7 +59,21 @@ public class ScriptThread implements Future<ScriptValue<?>> {
     }
 
     /**
+     * New instance without a thread group, and with {@link #getNextThreadName()} as name (same as {@link #ScriptThread(String, ParserRuleContext, Context)}
+     * with {@code null} as first argument)
+     * @param ctxToExecute the ANTLR4 context that will be executed
+     * @param context the parent context, will be cloned
+     * @throws ScriptException if the name is not available
+     */
+    public ScriptThread(@NotNull ParserRuleContext ctxToExecute, @NotNull Context context) {
+        this(null, ctxToExecute, context);
+    }
+
+    /**
      * New instance without a thread group, but with a name. if the name is null, it will be {@link #getNextThreadName()}
+     * @param threadName the real name that will be passed to the {@link Thread#Thread(ThreadGroup, Runnable, String)} constructor
+     * @param ctxToExecute the ANTLR4 context that will be executed
+     * @param context the parent context, will be cloned
      * @throws ScriptException if the name is not available
      */
     public ScriptThread(@Nullable String threadName, @NotNull ParserRuleContext ctxToExecute, @NotNull Context context) {
@@ -61,7 +81,7 @@ public class ScriptThread implements Future<ScriptValue<?>> {
             this.threadName = getNextThreadName();
         else if (isAvailableName(threadName)) this.threadName = threadName;
         else
-            throw new ScriptException(ScriptException.ExceptionType.THREAD_GROUP_ERROR, context, "Thread name \"" + threadName + "\" is already used.");
+            throw new ScriptException(ExceptionType.UNAVAILABLE_THREAD_NAME, context, "Thread name \"" + threadName + "\" is already used.");
         this.ctxToExecute = Objects.requireNonNull(ctxToExecute, "ctxToExecute was null in ScriptThread instantiation");
         // if it wouldn't be cloned, it would force the user to make separate variables if two thread are doing the same thing...
         this.context = Objects.requireNonNull(context, "context was null in ScriptThread instantiation").clone();
@@ -76,11 +96,6 @@ public class ScriptThread implements Future<ScriptValue<?>> {
 
     public ScriptsExecutor getScriptsExecutor() {
         return scriptsExecutor;
-    }
-
-    // TODO: add timeout, and call FutureTask#cancel() else
-    public void forceReturn() {
-        scriptsExecutor.forceReturn();
     }
 
     public @NotNull String getThreadName() {
@@ -101,42 +116,70 @@ public class ScriptThread implements Future<ScriptValue<?>> {
     }
 
     public void start() {
+        if (isCancelled) return;
         if (group != null) {
-            threadGroupExecutors.get(group).execute(() -> {
+            //noinspection unchecked
+            futureFromExecutorService = (Future<Void>) threadGroupExecutors.get(group).submit(() -> {
                 scriptsExecutor = new ScriptsExecutor(context);
                 scriptsExecutor.visit(ctxToExecute);
             });
         } else {
-            new Thread(DEFAULT_SCRIPTCOMMANDS_THREAD_GROUP, () -> {
+            thread = new Thread(DEFAULT_SCRIPTCOMMANDS_THREAD_GROUP, () -> {
                 scriptsExecutor = new ScriptsExecutor(context);
                 scriptsExecutor.visit(ctxToExecute);
-            }).start();
+            }, threadName);
+            thread.start();
         }
     }
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
+        isCancelled = true;
+        if (mayInterruptIfRunning) {
+            if (futureFromExecutorService != null) return futureFromExecutorService.cancel(true);
+            if (thread != null) thread.interrupt();
+            // if the two above are false it means the thread wasn't run
+            return true;
+        } else {
+            scriptsExecutor.forceReturn();
+        }
         return false;
     }
 
     @Override
     public boolean isCancelled() {
-        return false;
+        return isCancelled;
     }
 
     @Override
     public boolean isDone() {
-        return false;
+        return isCancelled || scriptsExecutor.hasReturned();
     }
 
     @Override
-    public ScriptValue<?> get() throws InterruptedException, ExecutionException {
-        return null;
+    public @NotNull ScriptValue<?> get() throws InterruptedException, ExecutionException {
+        if (isCancelled) return ScriptValue.NONE;
+        scriptsExecutor.onReturn(ignored -> ScriptThread.this.notifyAll());
+        while (! scriptsExecutor.hasReturned()) {
+            wait();
+        }
+        return scriptsExecutor.getReturned();
     }
 
     @Override
     public ScriptValue<?> get(long timeout, @NotNull TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-        return null;
+        long callDateNano = System.nanoTime();
+        if (isCancelled) return ScriptValue.NONE;
+        long timeoutNano = unit.toNanos(timeout);
+        long maxDateNano = callDateNano + timeoutNano;
+        scriptsExecutor.onReturn(ignored -> ScriptThread.this.notifyAll());
+        while (! scriptsExecutor.hasReturned()) {
+            if (System.nanoTime() >= maxDateNano) throw new TimeoutException();
+            long waitTimeNano = maxDateNano - timeoutNano;
+            long waitTimeMilli = TimeUnit.NANOSECONDS.toMillis(waitTimeNano);
+            wait(waitTimeMilli, (int) (TimeUnit.MILLISECONDS.toNanos(waitTimeNano) - waitTimeMilli));
+        }
+        return scriptsExecutor.getReturned();
     }
 
     /**
@@ -145,15 +188,15 @@ public class ScriptThread implements Future<ScriptValue<?>> {
      * as thread group for new threads in your executor.
      * @throws InvalidNameException if the name provided already exists
      */
-    public static void initialiseThreadGroup(String name, Executor executor) throws InvalidNameException {
+    public static void initialiseThreadGroup(String name, ExecutorService executor) throws InvalidNameException {
         if (threadGroupExecutors.containsKey(name)) throw new InvalidNameException("That thread group already exists");
         threadGroupExecutors.put(name, executor);
     }
 
     /**
-     * @see #initialiseThreadGroup(String, Executor)
+     * @see #initialiseThreadGroup(String, ExecutorService)
      */
-    public static @Nullable Executor getThreadGroup(String name) {
+    public static @Nullable ExecutorService getThreadGroup(String name) {
         return threadGroupExecutors.get(name);
     }
 }

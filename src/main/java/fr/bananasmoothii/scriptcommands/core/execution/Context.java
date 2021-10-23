@@ -23,7 +23,6 @@ import fr.bananasmoothii.scriptcommands.core.configsAndStorage.Config;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.ContainingScripts.Type;
 import fr.bananasmoothii.scriptcommands.core.configsAndStorage.StringScriptValueMap;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ContextStackTraceElement;
-import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType;
 import fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ScriptStackTraceElement;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.misc.Pair;
@@ -306,7 +305,7 @@ public class Context implements Cloneable {
 		ScriptsParser.StartContext parseTree = Objects.requireNonNull(
 				Config.getCorrespondingContainingScripts(scriptType, scriptName), scriptName + " doesn't exist as " + scriptType.name())
 				.parseTree;
-		ScriptThread scriptThread = new ScriptThread(new Context(scriptName, scriptType, baseVariables, triggeringPlayer), parseTree);
+		ScriptThread scriptThread = new ScriptThread(parseTree, new Context(scriptName, scriptType, baseVariables, triggeringPlayer));
 		scriptThread.start();
 		return scriptThread;
 	}

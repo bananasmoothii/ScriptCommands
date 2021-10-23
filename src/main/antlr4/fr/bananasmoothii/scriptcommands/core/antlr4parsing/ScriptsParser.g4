@@ -36,9 +36,8 @@ line
 	| switch_block
 	| breaker NEW_LINE
 	| assertion NEW_LINE
-	| thread_expression NEW_LINE
-	| thread_block
 	| throw_ NEW_LINE
+	| block_assignment
 	| NEW_LINE
 	;
 
@@ -53,9 +52,8 @@ line_only
 	| switch_block
 	| breaker
 	| assertion
-	| thread_expression
-	| thread_block
 	| throw_
+	| block_assignment
 	| NEW_LINE
 	;
 
@@ -109,6 +107,7 @@ expression
 	| maths
 	| comparison
 	| mini_if
+	| thread_expression
 	;
 
 expression_part
@@ -187,6 +186,13 @@ assignment
 	  operator = (PLUS | MINUS | TIMES | DIVIDE | FLOOR_DIVIDE | MODULO | POW)?
 	  ASSIGNMENT expression
 	;
+
+block_assignment // could be named "thread_assignment", but I think I will use the same for lamdas
+    : GLOBAL? VARIABLE
+      operator = (PLUS | MINUS | TIMES | DIVIDE | FLOOR_DIVIDE | MODULO | POW)?
+      ASSIGNMENT
+      value = thread_block
+    ;
 
 deletion
 	: DEL VARIABLE

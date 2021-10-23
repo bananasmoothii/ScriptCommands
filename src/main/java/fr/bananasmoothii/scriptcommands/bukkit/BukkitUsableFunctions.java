@@ -17,8 +17,8 @@
 package fr.bananasmoothii.scriptcommands.bukkit;
 
 
-import fr.bananasmoothii.scriptcommands.core.Util;
 import fr.bananasmoothii.scriptcommands.core.CustomLogger;
+import fr.bananasmoothii.scriptcommands.core.Util;
 import fr.bananasmoothii.scriptcommands.core.execution.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
@@ -50,7 +50,7 @@ public class BukkitUsableFunctions {
             }
             return players;
         }
-        throw new ScriptException(ScriptException.ExceptionType.INVALID_TYPE, context, "Passed argument is not a list or a text containing a player name. It is: " +
+        throw new ScriptException(ExceptionType.INVALID_TYPE, context, "Passed argument is not a list or a text containing a player name. It is: " +
                 Types.getPrettyArgAndType(arg));
     }
 

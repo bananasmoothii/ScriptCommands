@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.regex.Pattern;
 
-import static fr.bananasmoothii.scriptcommands.core.execution.ScriptException.ExceptionType.INVALID_ARGUMENTS;
+import static fr.bananasmoothii.scriptcommands.core.execution.ExceptionType.INVALID_ARGUMENTS;
 
 public class Args {
 
@@ -138,7 +138,7 @@ public class Args {
      * Note: as this can be a little slower than a simple getter, consider storing the result somewhere for not spamming that too much.
      * @param argName the name of an arg, specified by the {@link NamingPattern} or by the user with {@code arg1="some value"}
      * @return the matching {@link ScriptValue}
-     * @throws ScriptException (type: {@link ScriptException.ExceptionType#INVALID_ARGUMENTS INVALID_ARGUMENTS})
+     * @throws ScriptException (type: {@link ExceptionType#INVALID_ARGUMENTS INVALID_ARGUMENTS})
      * @see #getArgIfExist(String) getArgIfExist(String) - if you just want a null if that arg doesn't exists.
      */
     public @NotNull ScriptValue<Object> getArg(String argName) {
@@ -177,7 +177,7 @@ public class Args {
     /**
      * This is an easier and faster way to get one single arguments, if you know there should be one. There is no
      * need for a {@link NamingPattern} if you use this.
-     * @throws ScriptException (type: {@link ScriptException.ExceptionType#INVALID_ARGUMENTS INVALID_ARGUMENTS})
+     * @throws ScriptException (type: {@link ExceptionType#INVALID_ARGUMENTS INVALID_ARGUMENTS})
      * if there isn't one arg in total.
      */
     public @NotNull ScriptValue<Object> getSingleArg() {

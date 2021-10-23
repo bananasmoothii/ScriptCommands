@@ -36,8 +36,8 @@ public class ScriptException extends AbstractScriptException {
     protected ScriptStackTraceElement[] scriptStackTrace;
 
     public ScriptException(ExceptionType type, @NotNull Context context, String message) {
-        this(type.name(), context, message, null);
-        genericErrorDescription = type.description;
+        this(type.getName(), context, message, null);
+        genericErrorDescription = type.getDescription();
     }
 
     /**
@@ -45,8 +45,8 @@ public class ScriptException extends AbstractScriptException {
      *                             so {@link Context#callAndRun(String, Args, int, int)} was called
      */
     public ScriptException(ExceptionType type, @NotNull Context context, String message, @Nullable ScriptStackTraceElement where) {
-        this(type.name(), context, message, where);
-        genericErrorDescription = type.description;
+        this(type.getName(), context, message, where);
+        genericErrorDescription = type.getDescription();
     }
 
     /**
@@ -54,8 +54,8 @@ public class ScriptException extends AbstractScriptException {
      *                             so {@link Context#callAndRun(String, Args, int, int)} was called
      */
     public ScriptException(ExceptionType type, String message, @NotNull ContextStackTraceElement where) {
-        this(type.name(), where.context, message, where);
-        genericErrorDescription = type.description;
+        this(type.getName(), where.context, message, where);
+        genericErrorDescription = type.getDescription();
     }
 
     /**
@@ -134,53 +134,6 @@ public class ScriptException extends AbstractScriptException {
         this.scriptStackTrace = scriptStackTrace;
     }
 
-    // TODO: transform to classes so third-party programs can create new errors
-    public enum ExceptionType {
-        ASSERTION_ERROR("An assertion error happens when when using the \"assert\" keyword but the expression " +
-                "evaluates to false."),
-        CONVERSION_ERROR("A conversion error happens when you want to convert a type to another. For example, " +
-                "you can convert \"12.8\" (a string) to 12.8 (a decimal number), and 12.8 to an integer (it will be " +
-                "rounded to 12), but you can't convert a list to a boolean or whatever the heck you are thinking about " +
-                "(just joking you're intelligent <3)."),
-        GLOBAL_NOT_ALLOWED("Global not allowed means that you can't use the \"global\" keyword where you just used it."),
-        INVALID_ARGUMENTS("Invalid arguments happens when you don't give the right arguments to a function."),
-        INVALID_OPERATOR("Invalid operator happens when the operator you are using doesn't work with the two " +
-                "values you put in, for example you can't subtract a list to a boolean (what would that mean ??)"),
-        INVALID_TYPE("Invalid type happens when the type you are using doesn't work with the function you used " +
-                "it with. This happens very often in functions, but it can also show up in iterations (for i in ...), " +
-                "with the splat operator * not on a list or ** not on a dictionary, "),
-        NOT_DEFINED("Not defined is an error happening when you are calling a variable or a function that is " +
-                "not defined, or you are calling an element in a dictionary that doesn't exist (e.g. [=][\"something\"] )."),
-        NOT_LISTABLE("Not listable happens if you are using the 'in' keyword to check if an element is in a " +
-                "list/dictionary/text, but the last part is not a list (e.g. when you do something like if 10 in 12 {...}"),
-        NOT_OVERRIDABLE("Not overridable shows up when you try to create a variable but it already exists as " +
-                "function, or when you are creating a global variable but it already exists as non-global variable."),
-        OUT_OF_BOUNDS("Out of bounds just means you called an element in a list but your index was equal or " +
-                "above the number of elements in the list (remember that list indexes start at 0), or the negative " +
-                "equivalent. For example, if you have the list [\"a\", \"b\", \"c\"], you can call elements 0 " +
-                "(-> \"a\"), 1 (-> \"b\"), 2 (-> \"c\"), or negative index -1 (-> \"c\"), -2 (-> \"b\"), -3 (-> \"a\"). " +
-                "For a list of 3 elements, these are the only 6 indexes that will not cause an OUT_OF_BOUNDS error."),
-        PARSING_ERROR("A parsing error happens with eval() or exec(). These two functions are should not be used " +
-                "for more security, code readability and performance, but they are still here in case you found no other " +
-                "way. The code you provided to one of these function is not valid. Remember that eval() accepts only an " +
-                "expression, not full lines of code. For example, here is what is an expression: log foo.bar(foo1, bar1) ; " +
-                "4 * a ; 4 > a ; 4 > a ? \"a is small\" else \"a is big\" . Here is what is not an expression: if, for, " +
-                "thread, while, try..."),
-        SHOULD_NOT_HAPPEN("Hey ! You got a Should Not Happen error ! As the name states it, this error should " +
-                "never happen and it is a bug. Please report it at https://github.com/bananasmoothii/ScriptCommands/issues ."),
-        UNAVAILABLE_THREAD_NAME("Unavailable thread name means that you wanted to make a new thread with a name " +
-                "that already exists."),
-        THREAD_GROUP_ERROR("A thread group error can happen either when you are trying to make a new thread " +
-                "with a group that does not exist (like `thread in \"group_that_does_not_exist\" ...`), or when you create " +
-                "a new thread group with a name that already exists (like `TODO: write this section`), or when you try " + // TODO: write these
-                "to modify a thread group that does not exist (like `TODO: write this section too`)̀.");
-
-        public final String description;
-
-        ExceptionType(String description) {
-            this.description = description;
-        }
-    }
 
     public static class ScriptStackTraceElement {
         public final Context context;
@@ -289,12 +242,12 @@ public class ScriptException extends AbstractScriptException {
         protected @Nullable ScriptStackTraceElement where;
 
         public Incomplete(ExceptionType type, String message) {
-            this(type.name(), message, null);
-            genericErrorDescription = type.description;
+            this(type.getName(), message, null);
+            genericErrorDescription = type.getDescription();
         }
 
         public Incomplete(ExceptionType type, String message, @Nullable ScriptStackTraceElement where) {
-            this(type.name(), message, where);
+            this(type.getName(), message, where);
         }
 
         public Incomplete(String stringType, String message) {
